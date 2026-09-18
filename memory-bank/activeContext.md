@@ -2,7 +2,23 @@
 
 ## Current focus
 
-Phases 0-6 done. Next: Phase 7 autonomous constraint-loop solver.
+Phases 0-6 done. **AWAITING USER DECISION on next path (A vs B vs both).** Do not
+start coding until user picks. See "Decision pending" below.
+
+## Decision pending (start of next session)
+
+The 4×4-easy topology ablation was a NULL result (task saturates). Two ways forward,
+user to choose:
+- **A — hunt for topology separation** (extend Phase 6): re-run the ablation in a
+  capacity-pressured regime where wiring could matter — 9×9 (more epochs), smaller N
+  (e.g. 200), and/or fewer clues (hard/expert). Machinery already supports it: just
+  new AblationConfig / TrainConfig values (n_neurons, side, difficulty, epochs). This
+  is the real science payoff.
+- **B — Phase 7 autonomous solver**: constraint-propagation loop → full-puzzle solve
+  + completion metrics (see "Next steps" below).
+- Or **both, A then B**.
+
+User leaning: not yet stated. Ask/confirm before implementing.
 
 ## Recent changes
 
@@ -19,7 +35,16 @@ Phases 0-6 done. Next: Phase 7 autonomous constraint-loop solver.
 - sensory seeds = super_class in {sensory, sensory_ascending} OR flow=='afferent'.
 - transmitters: acetylcholine +1; gaba/glutamate −1; amines +1; unknown +1.
 
-## Next steps (Phase 7 — autonomous solver)
+## Next steps — Path A (topology separation hunt)
+
+1. Re-run `experiments/topology_ablation.py` in capacity-pressured regimes (pick one
+   or more): (a) side=9 with more epochs/data; (b) n_neurons=200; (c) difficulty
+   hard/expert on 4×4 or 9×9. Add `dense`/`feedforward` conditions for full §18 set.
+2. Multiple seeds (≥3), report mean±spread; compare flywire vs shuffled (key null).
+3. If still null across regimes → honest finding: topology doesn't help this task.
+   If separation appears → the headline result.
+
+## Next steps — Path B (Phase 7 autonomous solver)
 
 1. `sudoku`/`evaluation`: constraint-propagation solve loop. Given a puzzle + trained
    model: encode board → model logits (B=1) → mask illegal (encoder.legal_action_mask)
