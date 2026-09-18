@@ -4,12 +4,14 @@
 
 - Finalized plan (`PLAN.md`) with locked design decisions
 - Memory bank + `CLAUDE.md` scaffolding
+- **Phase 0 env verified**: uv venv, torch 2.5.1+cu124, norse 1.1.0, CUDA sees
+  RTX 2060, GPU matmul OK. `pyproject.toml` + `uv.lock` committed.
 
 ## What's left
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| 0 env (uv, torch, Norse, CUDA check) | **next** | pyproject first — eyeball before install |
+| 0 env (uv, torch, Norse, CUDA check) | **DONE** | torch 2.5.1+cu124, norse 1.1.0, RTX 2060 ✓ |
 | 1 Sudoku 4×4 then 9×9 | pending | no GPU |
 | 2 MLP baseline | pending | gate: must work before FlyWire |
 | 3 dense SNN (AMP, T=10, checkpoint) | pending | GPU |
@@ -20,7 +22,8 @@
 
 ## Current status
 
-Pre-implementation. Repo has plan + docs only. No packages installed.
+Phase 0 complete. Env installed + GPU-verified. Next: Phase 1 Sudoku
+generator/solver/env/renderer, 4×4 first.
 
 ## Known issues / risks
 

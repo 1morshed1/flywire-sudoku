@@ -1,0 +1,65 @@
+# pyproject.toml — FlyWire-Sudoku dependency manifest (uv-managed)
+#
+# EYEBALL THIS BEFORE INSTALL. Nothing is installed until you approve `uv sync`.
+#
+# Notes / risk flags:
+#  - torch is pulled from PyTorch's CUDA 12.4 wheel index (cu124). RTX 2060 is
+#    Turing sm_75 — fully supported by modern cu12 wheels.
+#  - Norse (spiking-NN layer on torch) is the fragile pin. Its released wheels can
+#    lag the newest torch/Python. If `uv sync` fails to resolve norse against
+#    torch 2.5 on py3.12, fallback options (in order): (a) loosen to torch ~2.4,
+#    (b) install norse from git main, (c) drop to py3.11. Decide at sync time.
+#  - caveclient / FlyWire data deps are NOT here yet — added in Phase 4 to keep
+#    the Phase 0 env minimal.
+
+[project]
+name = "flywire-sudoku"
+version = "0.0.1"
+description = "FlyWire-connectome-constrained spiking neural network for Sudoku symbolic reasoning"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+
+dependencies = [
+    # --- core numerics ---
+    "numpy>=1.26",
+    "scipy>=1.13",            # sparse COO/CSR adjacency, .npz persistence
+    "polars>=1.0",           # lazy/streaming read of multi-GB FlyWire parquet
+    "pandas>=2.2",           # small metadata frames / interop
+    "pyarrow>=16.0",         # parquet backend
+
+    # --- deep learning ---
+    "torch>=2.4,<2.6",       # cu124 wheel via [tool.uv.index] below
+    "norse>=1.1.0",          # LIF neurons + surrogate gradients (RISK: see header)
+
+    # --- graph / connectome ---
+    "networkx>=3.3",         # WCC, degree stats, topology shuffles for ablations
+
+    # --- environment / RL scaffolding ---
+    "gymnasium>=0.29",       # Sudoku env API (RL is Phase 7, optional)
+
+    # --- config / experiment plumbing ---
+    "pyyaml>=6.0",           # config-driven runs
+    "tqdm>=4.66",            # progress bars
+    "matplotlib>=3.9",       # metrics + spike-raster + board visualization
+]
+
+[dependency-groups]
+# dev-only; install with `uv sync --group dev`
+dev = [
+    "ruff>=0.6",             # lint + format
+    "pytest>=8.0",           # solver/generator/env unit tests
+    "ipython>=8.0",
+]
+
+# --- pull torch from the CUDA 12.4 wheel index instead of PyPI CPU wheels ---
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
