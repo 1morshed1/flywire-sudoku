@@ -11,8 +11,9 @@ changes.
 
 ## Non-negotiables
 
-1. Hardware: RTX 2060 **6 GB** — trainable ceiling ~10k–20k neurons, batch 32–64, T=10,
-   AMP + gradient checkpointing. Full 139k = inference/eval only.
+1. Hardware: RTX 2060 **6 GB**. Sparse FlyWire SNN measured ~40k neurons trainable
+   (20k = 2.4 GB @ batch 64, T=10); memory scales with edge count, not N². Full 139k =
+   inference/eval only.
 2. Package manager: **uv**. Eyeball deps before install.
 3. Framework: **Norse** + torch CUDA 12.x. Pin versions at install.
 4. Connectome: public Codex parquet; synapse count **≥ 5**; signs-free first.
@@ -42,6 +43,39 @@ globally most-confident legal digit → repeat.
 
 0 env → 1 sudoku → 2 MLP → 3 dense SNN → 4 FlyWire data → 5 scaling →
 6 topology ablations → 7 autonomous solve
+
+Phases 0–6 DONE; Phase 7 pending. Current status/decisions live in `memory-bank/`.
+
+## Commands
+
+All commands use `uv run --no-sync` (env already synced).
+
+```bash
+uv sync                                                   # install deps (first time)
+uv run --no-sync pytest tests/ -q                         # full test suite
+uv run --no-sync ruff check . --fix && uv run --no-sync ruff format .   # lint + format
+uv run --no-sync python -m connectome.download            # fetch FAFB v783 -> data/flywire/
+uv run --no-sync python -m training.supervised --config configs/mlp_baseline.yaml
+uv run --no-sync python -m training.supervised --config configs/dense_snn.yaml
+uv run --no-sync python -m training.supervised --config configs/flywire_snn_1k.yaml
+uv run --no-sync python -m experiments.topology_ablation --quick   # fast 4x4 sweep
+```
+
+Notes: training is config-driven (`configs/*.yaml` mirror `TrainConfig`). GPU runs
+(5k-puzzle 9×9 gen + train) take minutes — run in background. Big feathers + results are
+gitignored under `data/`, `results/`.
+
+## Repo map
+
+```text
+sudoku/       core (SudokuSpec), solver, generator, encoder, environment, renderer
+models/       mlp, dense_snn, flywire_snn — shared I/O: one-hot board -> (B, cells, side)
+connectome/   download, loader, filter, adjacency, sampling, topology, pipeline, statistics
+training/     dataset, supervised (train_supervised + build_model dispatch, TrainConfig)
+experiments/  topology_ablation
+tests/        one test_*.py per package
+configs/      *.yaml per model / experiment
+```
 
 ## Memory bank
 
