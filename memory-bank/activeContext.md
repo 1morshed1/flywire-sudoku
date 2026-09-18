@@ -2,23 +2,26 @@
 
 ## Current focus
 
-Phases 0-2 done. Next: Phase 3 dense SNN.
+Phases 0-3 done. Next: Phase 4 FlyWire connectome data.
 
 ## Recent changes
 
-- Phase 1: `sudoku/` package, size-generic 4×4+9×9, 25 tests, ruff clean
-- Phase 2: MLP baseline (`models/mlp.py`), supervised pipeline
-  (`training/dataset.py`, `training/supervised.py`), configs/mlp_baseline.yaml.
-  Task = full-grid move prediction, masked CE over empty cells. 29 tests pass.
-  Gate met: 4×4 move_acc ~0.94.
+- Phase 2: MLP baseline + supervised pipeline. 4×4 move_acc ~0.94.
+- Phase 3: `models/dense_snn.py` (SudokuDenseSNN, Norse LIF + LICell readout,
+  T-step sim in forward, constant/poisson encoding). Generalized training:
+  `train_supervised` + `build_model` dispatch, AMP support. 33 tests pass.
+  Gate met: 4×4 SNN move_acc ~0.94 @50ep.
 
 ## Next steps
 
-1. Phase 3: `models/dense_snn.py` — Norse LIF spiking net, same I/O contract.
-   Poisson-encode board (encoder.poisson_encode), T=10, surrogate gradients,
-   AMP + gradient checkpointing for VRAM. Reuse training/supervised loop.
-2. Add spike-rate readout -> logits; keep move_acc/solve_rate metrics.
-3. Get dense SNN working BEFORE any FlyWire connectome (Phase 4).
+1. Phase 4 (no GPU): FlyWire connectome data engineering.
+   - Fetch Codex public parquet dumps (neurons, synapses, neurotransmitters).
+   - `connectome/loader.py` (Polars lazy read), `filter.py` (synapse count ≥5),
+     `adjacency.py` (sparse COO/scipy .npz), `sampling.py` (PRINCIPLED subsampling:
+     largest WCC / BFS-from-sensory / top-degree — never random), `statistics.py`.
+   - Store under data/flywire/ (gitignored). Log dump version + thresholds.
+2. NEED FROM USER: confirm Codex dump source/URL, or whether to write a small
+   download helper vs manual download. FlyWire data has citation/license terms.
 
 ## Task-framing note
 

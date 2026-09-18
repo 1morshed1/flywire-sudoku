@@ -15,7 +15,7 @@ serves the MLP baseline and the later SNNs.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import torch
 import torch.nn.functional as F
@@ -84,9 +84,13 @@ def evaluate(model: nn.Module, loader: DataLoader, device: torch.device) -> dict
 class TrainConfig:
     """Configuration for a supervised run. Mirrors the YAML config files."""
 
+    model: str = "mlp"  # "mlp" | "dense_snn"
     side: int = 9
     hidden: tuple[int, ...] = (512, 256)
-    dropout: float = 0.0
+    dropout: float = 0.0  # MLP only
+    # Spiking-model options (ignored by the MLP):
+    T: int = 10
+    encoding: str = "constant"  # "constant" | "poisson"
     n_train: int = 5000
     n_val: int = 500
     difficulty: str = "easy"
@@ -94,20 +98,33 @@ class TrainConfig:
     batch_size: int = 128
     lr: float = 1e-3
     weight_decay: float = 0.0
+    amp: bool = False  # mixed precision (CUDA only); PLAN.md §R4
     seed: int = 0
     device: str = "auto"
     log_every: int = 1
     extra: dict = field(default_factory=dict)
 
 
-def train_mlp(cfg: TrainConfig, *, verbose: bool = True) -> dict[str, float]:
-    """Train the MLP baseline and return final validation metrics.
+def build_model(spec: SudokuSpec, cfg: TrainConfig) -> nn.Module:
+    """Instantiate the model named by ``cfg.model`` (shared I/O contract)."""
+    if cfg.model == "mlp":
+        from models import SudokuMLP
 
-    Kept deliberately small and dependency-light (no W&B) so it runs anywhere; a
-    richer experiment-tracking path can wrap this later.
+        return SudokuMLP(spec, hidden=cfg.hidden, dropout=cfg.dropout)
+    if cfg.model == "dense_snn":
+        from models import SudokuDenseSNN
+
+        return SudokuDenseSNN(spec, hidden=cfg.hidden, T=cfg.T, encoding=cfg.encoding)
+    raise ValueError(f"unknown model {cfg.model!r}")
+
+
+def train_supervised(cfg: TrainConfig, *, verbose: bool = True) -> dict[str, float]:
+    """Train any model with the shared contract; return final validation metrics.
+
+    Model-agnostic: dispatches on ``cfg.model``. Optional AMP (mixed precision) is
+    used only on CUDA and helps the spiking models fit the 6 GB budget (PLAN.md §R4).
+    Kept dependency-light (no W&B) so it runs anywhere.
     """
-    from models import SudokuMLP  # local import keeps torch optional at module load
-
     torch.manual_seed(cfg.seed)
     spec = SudokuSpec.from_side(cfg.side)
     device = pick_device(cfg.device)
@@ -117,13 +134,16 @@ def train_mlp(cfg: TrainConfig, *, verbose: bool = True) -> dict[str, float]:
     train_loader = DataLoader(SudokuMoveDataset(train_t), batch_size=cfg.batch_size, shuffle=True)
     val_loader = DataLoader(SudokuMoveDataset(val_t), batch_size=cfg.batch_size)
 
-    model = SudokuMLP(spec, hidden=cfg.hidden, dropout=cfg.dropout).to(device)
+    model = build_model(spec, cfg).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    use_amp = cfg.amp and device.type == "cuda"
+    # GradScaler is a no-op when disabled, so it is safe to construct on CPU too.
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
     if verbose:
         print(
-            f"[mlp] side={cfg.side} params={model.num_parameters():,} "
-            f"device={device} train={cfg.n_train} val={cfg.n_val}"
+            f"[{cfg.model}] side={cfg.side} params={model.num_parameters():,} "
+            f"device={device} amp={use_amp} train={cfg.n_train} val={cfg.n_val}"
         )
 
     metrics: dict[str, float] = {}
@@ -133,19 +153,28 @@ def train_mlp(cfg: TrainConfig, *, verbose: bool = True) -> dict[str, float]:
         for x, target, empty in train_loader:
             x, target, empty = x.to(device), target.to(device), empty.to(device)
             opt.zero_grad()
-            loss = masked_ce_loss(model(x), target, empty)
-            loss.backward()
-            opt.step()
+            with torch.autocast(device_type=device.type, enabled=use_amp):
+                loss = masked_ce_loss(model(x), target, empty)
+            scaler.scale(loss).backward()
+            scaler.step(opt)
+            scaler.update()
             running += float(loss) * x.shape[0]
         metrics = evaluate(model, val_loader, device)
         if verbose and (epoch % cfg.log_every == 0 or epoch == cfg.epochs):
             print(
-                f"[mlp] epoch {epoch:3d}  loss {running / cfg.n_train:.4f}  "
+                f"[{cfg.model}] epoch {epoch:3d}  loss {running / cfg.n_train:.4f}  "
                 f"move_acc {metrics['move_acc']:.3f}  solve_rate {metrics['solve_rate']:.3f}"
             )
 
     metrics["params"] = float(model.num_parameters())
     return metrics
+
+
+def train_mlp(cfg: TrainConfig, *, verbose: bool = True) -> dict[str, float]:
+    """Backwards-compatible wrapper: train with ``cfg.model`` forced to ``"mlp"``."""
+    if cfg.model != "mlp":
+        cfg = replace(cfg, model="mlp")
+    return train_supervised(cfg, verbose=verbose)
 
 
 def _load_yaml_config(path: str) -> TrainConfig:
@@ -163,8 +192,8 @@ def _load_yaml_config(path: str) -> TrainConfig:
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     import argparse
 
-    parser = argparse.ArgumentParser(description="Train the Sudoku MLP baseline.")
+    parser = argparse.ArgumentParser(description="Train a Sudoku model (MLP or SNN).")
     parser.add_argument("--config", type=str, default=None, help="YAML config path")
     args = parser.parse_args()
     config = _load_yaml_config(args.config) if args.config else TrainConfig()
-    train_mlp(config)
+    train_supervised(config)

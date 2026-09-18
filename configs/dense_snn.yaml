@@ -1,0 +1,23 @@
+# Dense spiking network baseline (PLAN.md Phase 3 / §6, Model 1).
+# Run: uv run --no-sync python -m training.supervised --config configs/dense_snn.yaml
+
+model: dense_snn
+side: 9                 # 4 for fast debug, 9 for standard
+hidden: [512, 256]      # LIF layer widths -> 810 -> 512 LIF -> 256 LIF -> 729
+
+T: 10                   # simulation timesteps (VRAM-conscious; PLAN.md R3)
+encoding: constant      # "constant" (direct current, stable) or "poisson" (spikes)
+
+n_train: 5000
+n_val: 1000
+difficulty: easy
+
+epochs: 40
+batch_size: 256
+lr: 0.001
+weight_decay: 0.0
+amp: true               # mixed precision on the RTX 2060 (PLAN.md R4)
+
+seed: 0
+device: auto
+log_every: 2

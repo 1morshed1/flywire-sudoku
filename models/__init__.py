@@ -14,6 +14,7 @@ All models share the same I/O contract so training/eval code is model-agnostic:
 where output ``[b, cell, d]`` scores placing digit ``d+1`` in ``cell``.
 """
 
+from .dense_snn import SudokuDenseSNN
 from .mlp import SudokuMLP
 
-__all__ = ["SudokuMLP"]
+__all__ = ["SudokuDenseSNN", "SudokuMLP"]
