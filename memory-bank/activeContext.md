@@ -2,26 +2,34 @@
 
 ## Current focus
 
-Phases 0-3 done. Next: Phase 4 FlyWire connectome data.
+Phases 0-4 done. Next: Phase 5 FlyWire-constrained SNN.
 
 ## Recent changes
 
-- Phase 2: MLP baseline + supervised pipeline. 4×4 move_acc ~0.94.
-- Phase 3: `models/dense_snn.py` (SudokuDenseSNN, Norse LIF + LICell readout,
-  T-step sim in forward, constant/poisson encoding). Generalized training:
-  `train_supervised` + `build_model` dispatch, AMP support. 33 tests pass.
-  Gate met: 4×4 SNN move_acc ~0.94 @50ep.
+- Phase 3: dense SNN works (4×4 ~0.94), AMP verified on 2060.
+- Phase 4: `connectome/` pipeline. FAFB v783 via public GCS mirror
+  (gs://lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/fafb_783/),
+  no auth. Files: meta.feather (13MB), simple_edgelist.feather (302MB, cols
+  pre/post/count/norm/total_input). count≥5 → 135,453 nodes / 3.53M edges,
+  WCC 98.8%. Sparse scipy adjacency, transmitter signs, principled sampling.
+  11 tests pass. Data in data/flywire/ (gitignored) + provenance.json.
 
-## Next steps
+## Data facts (memorize)
 
-1. Phase 4 (no GPU): FlyWire connectome data engineering.
-   - Fetch Codex public parquet dumps (neurons, synapses, neurotransmitters).
-   - `connectome/loader.py` (Polars lazy read), `filter.py` (synapse count ≥5),
-     `adjacency.py` (sparse COO/scipy .npz), `sampling.py` (PRINCIPLED subsampling:
-     largest WCC / BFS-from-sensory / top-degree — never random), `statistics.py`.
-   - Store under data/flywire/ (gitignored). Log dump version + thresholds.
-2. NEED FROM USER: confirm Codex dump source/URL, or whether to write a small
-   download helper vs manual download. FlyWire data has citation/license terms.
+- meta id column = `fafb_783_id`; classes in `super_class` (sensory 16.9k,
+  optic_lobe_intrinsic 77.8k, central_brain_intrinsic 32.5k, motor 106…).
+- sensory seeds = super_class in {sensory, sensory_ascending} OR flow=='afferent'.
+- transmitters: acetylcholine +1; gaba/glutamate −1; amines +1; unknown +1.
+
+## Next steps (Phase 5)
+
+1. `models/flywire_snn.py`: recurrent LIF SNN. Fixed sparse mask A from a sampled
+   subgraph (connectome.sampling); trainable recurrent weights W, W_eff = W ⊙ A.
+   Input projection (810→N) + recurrent FlyWire layer + output projection (N→729).
+   Use torch.sparse for the masked recurrent matmul. T=10, surrogate grads, AMP.
+2. Scale N=1k→5k→10k→20k; VRAM-benchmark each rung (log neurons/edges/VRAM/time).
+3. Reuse the supervised loop; extend build_model with 'flywire_snn' + connectome cfg.
+4. Optional: cache a built subgraph (connectome.adjacency.save) for fast reload.
 
 ## Task-framing note
 

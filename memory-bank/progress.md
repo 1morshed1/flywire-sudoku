@@ -23,7 +23,14 @@
   + LICell readout, T-step sim inside forward, constant/poisson encoding). Training
   loop generalized: `train_supervised` dispatches via `build_model`; AMP added
   (torch.amp autocast + GradScaler). 33 tests pass. Gate met: 4×4 easy move_acc
-  ~0.94 / solve_rate ~0.70 @50 epochs (CPU). 9×9 GPU+AMP: pending.
+  ~0.94 / solve_rate ~0.70 @50 epochs (CPU). 9×9 GPU+AMP (5k, 30ep, 274s):
+  move_acc 0.209, underfit — AMP verified working on RTX 2060, no crash.
+- **Phase 4 FlyWire data**: `connectome/` package (download/loader/filter/adjacency/
+  sampling/statistics). Public GCS mirror (FAFB v783, no auth) → meta (13MB) +
+  simple_edgelist (302MB). count≥5 → 135,453 nodes, 3.53M edges, largest WCC 98.8%.
+  Sparse scipy COO/CSR adjacency; transmitter signs (+92552/−42901). PRINCIPLED
+  sampling (top_degree/bfs/bfs_sensory all give connected subgraphs; random control
+  = dead islands, confirmed). 11 tests pass (incl. real-data integration).
 
 ## What's left
 
@@ -32,17 +39,18 @@
 | 0 env (uv, torch, Norse, CUDA check) | **DONE** | torch 2.5.1+cu124, norse 1.1.0, RTX 2060 ✓ |
 | 1 Sudoku 4×4 then 9×9 | **DONE** | 25 tests pass; solver/gen/env/encoder/renderer |
 | 2 MLP baseline | **DONE** | gate met (4×4 acc ~0.94); 9×9 logged |
-| 3 dense SNN (Norse LIF, T=10, AMP) | **DONE** | 4×4 acc ~0.94 @50ep; 9×9 GPU number pending |
-| 4 FlyWire Codex → sparse COO + sampling | pending | no GPU |
+| 3 dense SNN (Norse LIF, T=10, AMP) | **DONE** | 4×4 acc ~0.94; 9×9 AMP verified |
+| 4 FlyWire Codex → sparse COO + sampling | **DONE** | FAFB v783; 135k nodes/3.5M edges; principled sampling |
 | 5 FlyWire-SNN scale 1k→20k | pending | VRAM bench each rung |
 | 6 topology ablations | pending | science core |
 | 7 autonomous constraint loop (+ opt RL) | pending | GPU |
 
 ## Current status
 
-Phases 0-3 complete. MLP + dense SNN both learn the task (gates passed). Next:
-Phase 4 — FlyWire connectome data (Codex public parquet dumps → filter edges
-count≥5 → sparse COO adjacency → principled subsampling). No GPU; data engineering.
+Phases 0-4 complete. Baselines learn the task; FlyWire connectome loaded + sparse
+adjacency + principled sampling ready. Next: Phase 5 — FlyWire-constrained SNN
+(`models/flywire_snn.py`): recurrent LIF with W_eff = W_trainable * A (fixed sparse
+mask from a sampled subgraph), scale 1k→10k→20k, VRAM-benchmark each rung.
 
 ## Known issues / risks
 
