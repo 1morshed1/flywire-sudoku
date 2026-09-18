@@ -62,8 +62,6 @@
 | 4 FlyWire Codex → sparse COO + sampling | **DONE** | FAFB v783; 135k nodes/3.5M edges |
 | 5 FlyWire-SNN scale 1k→20k | **DONE** | works (4×4 ~0.93); VRAM benchmarked, ~40k feasible |
 | 6 topology ablations | **DONE** | topology controls + ablation runner; degree-shuffle null verified |
-| 5 FlyWire-SNN scale 1k→20k | pending | VRAM bench each rung |
-| 6 topology ablations | pending | science core |
 | 7 autonomous constraint loop (+ opt RL) | pending | GPU |
 
 ## Current status
@@ -75,7 +73,9 @@ legal digit, repeat). Uses sudoku env + a trained model; add evaluation/ metrics
 
 ## Known issues / risks
 
-- 6 GB VRAM hard ceiling; 50k+ train won't fit
+- 6 GB VRAM ceiling: sparse recurrent SNN measured ~40k neurons trainable (20k=2.4GB);
+  much higher than the earlier dense estimate.
+- 4×4-easy ablation saturates (topology null); need harder regime for separation.
 - Norse resolved fine vs torch 2.5 on py3.12 (no fallback needed)
 - Random connectome subsample → dead islands (must use principled methods)
 - Multi-GB parquet needs Polars streaming, not eager Pandas
