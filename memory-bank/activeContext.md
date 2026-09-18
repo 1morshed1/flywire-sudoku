@@ -2,16 +2,15 @@
 
 ## Current focus
 
-Phases 0-5 done. Next: Phase 6 topology ablations (the science).
+Phases 0-6 done. Next: Phase 7 autonomous constraint-loop solver.
 
 ## Recent changes
 
-- Phase 4: `connectome/` pipeline, FAFB v783, 135k nodes/3.5M edges (count≥5).
-- Phase 5: `models/flywire_snn.py` (FlyWireSNN) + `connectome/pipeline.py`
-  (subgraph API, lru_cached full graph). Recurrent LIF, W_eff = w_edge ⊙ A via
-  torch.sparse.mm. Wired into build_model ('flywire_snn') + TrainConfig
-  (n_neurons/sample_method/train_recurrent/use_signs). 50 tests pass. 4×4 real
-  1k subgraph ~0.93. VRAM: 20k=2.4GB → ~40k feasible on 6GB.
+- Phase 5: `models/flywire_snn.py` (FlyWireSNN), sparse recurrent, 4×4 ~0.93.
+- Phase 6: `connectome/topology.py` (degree_preserving_shuffle key null +
+  erdos_renyi_like/dense/feedforward, matched N+edges). `topology` knob in
+  build_model/TrainConfig. `experiments/topology_ablation.py` runner.
+  57 tests pass. Structural signature: flywire recip 0.405 vs shuffled 0.038.
 
 ## Data facts (memorize)
 
@@ -20,21 +19,22 @@ Phases 0-5 done. Next: Phase 6 topology ablations (the science).
 - sensory seeds = super_class in {sensory, sensory_ascending} OR flow=='afferent'.
 - transmitters: acetylcholine +1; gaba/glutamate −1; amines +1; unknown +1.
 
-## Next steps (Phase 6 — topology ablations)
+## Next steps (Phase 7 — autonomous solver)
 
-1. Topology controls at matched budget (PLAN.md §17-18): FlyWire vs
-   degree-preserving-shuffled FlyWire (the key null) vs uniform-random vs dense vs
-   feed-forward. Add a `degree_preserving_shuffle(adj)` (configuration model) — put
-   in connectome/ (e.g. topology.py) so build_model can swap the mask.
-2. `experiments/topology_ablation.py`: run each condition (multiple seeds), same
-   n_neurons/params, log move_acc/solve_rate + graph stats; compare FlyWire vs shuffle.
-3. Then Phase 7: autonomous constraint-propagation solve loop (sudoku env + model
-   scoring empty cells, place most-confident legal, repeat).
+1. `sudoku`/`evaluation`: constraint-propagation solve loop. Given a puzzle + trained
+   model: encode board → model logits (B=1) → mask illegal (encoder.legal_action_mask)
+   → pick globally most-confident (cell,digit) → place via env → repeat until solved or
+   stuck. Reuse SudokuEnv(task='place').
+2. `evaluation/`: puzzle-completion rate, steps-to-solve, invalid-move rate, per-model
+   comparison (MLP/dense/flywire). PLAN.md §22.
+3. Optional Phase 8 polish + RL fine-tuning (deferred; constraint-loop is the spine).
 
 ## Notes
 
 - AMP kept OFF for flywire_snn (sparse.mm + autocast not verified); dense models use it.
-- flywire_snn learnability test is guarded on data/flywire/ presence (skips offline).
+- flywire_snn + ablation learnability tests guarded on data/flywire/ presence.
+- 4×4 easy may SATURATE (~0.93 all topologies) → topology separation likely needs 9×9
+  or harder/lower-capacity regime. Interpret ablation numbers with that in mind.
 
 ## Task-framing note
 

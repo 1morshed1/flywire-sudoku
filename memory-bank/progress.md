@@ -38,6 +38,13 @@
   50 tests pass. WORKS: 4×4 real 1k subgraph move_acc ~0.93 / solve_rate ~0.65.
   VRAM scaling (RTX 2060, batch 64, T=10): 1k=59MB, 5k=306MB, 10k=795MB, 20k=2.4GB
   — sparse recurrence → ~40k feasible (ceiling revised up from dense estimate).
+- **Phase 6 topology ablations**: `connectome/topology.py` (degree_preserving_shuffle
+  [key null, per-node in+out degree preserved exactly], erdos_renyi_like, dense,
+  feedforward; all matched N + edge count). `topology`/`topology_seed` in TrainConfig +
+  build_model. `experiments/topology_ablation.py` runner (conditions × seeds → JSON +
+  table). 7 topology tests pass (57 total). Structural signature: flywire reciprocity
+  0.405 vs shuffled 0.038 vs random 0.022 vs feedforward 0.000 (matched degree). Real
+  ablation numbers: see below when sweep completes.
 
 ## What's left
 
@@ -49,17 +56,17 @@
 | 3 dense SNN (Norse LIF, T=10, AMP) | **DONE** | 4×4 acc ~0.94; 9×9 AMP verified |
 | 4 FlyWire Codex → sparse COO + sampling | **DONE** | FAFB v783; 135k nodes/3.5M edges |
 | 5 FlyWire-SNN scale 1k→20k | **DONE** | works (4×4 ~0.93); VRAM benchmarked, ~40k feasible |
+| 6 topology ablations | **DONE** | topology controls + ablation runner; degree-shuffle null verified |
 | 5 FlyWire-SNN scale 1k→20k | pending | VRAM bench each rung |
 | 6 topology ablations | pending | science core |
 | 7 autonomous constraint loop (+ opt RL) | pending | GPU |
 
 ## Current status
 
-Phases 0-5 complete. The core experiment runs: FlyWire-constrained SNN learns Sudoku
-(4×4 real 1k subgraph ~0.93). Model ladder done (MLP / dense SNN / FlyWire SNN). Next:
-Phase 6 — topology ablations (the science): FlyWire vs degree-matched-random vs random
-vs dense/feed-forward at matched budget; the `random` sampler + a degree-preserving
-shuffle are the key controls. Then Phase 7 autonomous constraint-loop solver.
+Phases 0-6 complete. Model ladder + topology-ablation machinery done. Next: Phase 7 —
+autonomous constraint-propagation solve loop (score empty cells, place most-confident
+legal digit, repeat). Uses sudoku env + a trained model; add evaluation/ metrics
+(puzzle completion, steps-to-solve, invalid-rate) per PLAN.md §22.
 
 ## Known issues / risks
 

@@ -95,6 +95,8 @@ class TrainConfig:
     n_neurons: int = 1000
     sample_method: str = "top_degree"  # top_degree | bfs | bfs_sensory | random
     conn_weight: str = "count"  # edge weight source for the connectome mask
+    topology: str = "flywire"  # flywire | shuffled | random | dense | feedforward
+    topology_seed: int = 0
     train_recurrent: bool = True  # False = Regime C (frozen connectome)
     use_signs: bool = False  # True = Regime B (Dale's-law signs)
     recurrent_scale: float = 1.0
@@ -124,11 +126,15 @@ def build_model(spec: SudokuSpec, cfg: TrainConfig) -> nn.Module:
         return SudokuDenseSNN(spec, hidden=cfg.hidden, T=cfg.T, encoding=cfg.encoding)
     if cfg.model == "flywire_snn":
         from connectome.pipeline import subgraph
+        from connectome.topology import apply_topology
         from models import FlyWireSNN
 
         sub, signs = subgraph(
             cfg.n_neurons, method=cfg.sample_method, weight=cfg.conn_weight, seed=cfg.seed
         )
+        # Topology ablation: swap the connectome mask for a matched control (§17-18).
+        # node_ids are preserved, so the sign vector stays aligned.
+        sub = apply_topology(sub, cfg.topology, seed=cfg.topology_seed)
         return FlyWireSNN(
             spec,
             sub,
