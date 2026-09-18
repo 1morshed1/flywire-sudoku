@@ -31,6 +31,13 @@
   Sparse scipy COO/CSR adjacency; transmitter signs (+92552/−42901). PRINCIPLED
   sampling (top_degree/bfs/bfs_sensory all give connected subgraphs; random control
   = dead islands, confirmed). 11 tests pass (incl. real-data integration).
+- **Phase 5 FlyWire SNN**: `models/flywire_snn.py` (FlyWireSNN), `connectome/
+  pipeline.py` (cached full graph + subgraph API). Recurrent LIF, W_eff = w_edge ⊙ A
+  via torch.sparse.mm (autograd on edge weights, orientation test passes). 3 regimes
+  (trainable/frozen/signs). Wired into train_supervised + build_model + config.
+  50 tests pass. WORKS: 4×4 real 1k subgraph move_acc ~0.93 / solve_rate ~0.65.
+  VRAM scaling (RTX 2060, batch 64, T=10): 1k=59MB, 5k=306MB, 10k=795MB, 20k=2.4GB
+  — sparse recurrence → ~40k feasible (ceiling revised up from dense estimate).
 
 ## What's left
 
@@ -40,17 +47,19 @@
 | 1 Sudoku 4×4 then 9×9 | **DONE** | 25 tests pass; solver/gen/env/encoder/renderer |
 | 2 MLP baseline | **DONE** | gate met (4×4 acc ~0.94); 9×9 logged |
 | 3 dense SNN (Norse LIF, T=10, AMP) | **DONE** | 4×4 acc ~0.94; 9×9 AMP verified |
-| 4 FlyWire Codex → sparse COO + sampling | **DONE** | FAFB v783; 135k nodes/3.5M edges; principled sampling |
+| 4 FlyWire Codex → sparse COO + sampling | **DONE** | FAFB v783; 135k nodes/3.5M edges |
+| 5 FlyWire-SNN scale 1k→20k | **DONE** | works (4×4 ~0.93); VRAM benchmarked, ~40k feasible |
 | 5 FlyWire-SNN scale 1k→20k | pending | VRAM bench each rung |
 | 6 topology ablations | pending | science core |
 | 7 autonomous constraint loop (+ opt RL) | pending | GPU |
 
 ## Current status
 
-Phases 0-4 complete. Baselines learn the task; FlyWire connectome loaded + sparse
-adjacency + principled sampling ready. Next: Phase 5 — FlyWire-constrained SNN
-(`models/flywire_snn.py`): recurrent LIF with W_eff = W_trainable * A (fixed sparse
-mask from a sampled subgraph), scale 1k→10k→20k, VRAM-benchmark each rung.
+Phases 0-5 complete. The core experiment runs: FlyWire-constrained SNN learns Sudoku
+(4×4 real 1k subgraph ~0.93). Model ladder done (MLP / dense SNN / FlyWire SNN). Next:
+Phase 6 — topology ablations (the science): FlyWire vs degree-matched-random vs random
+vs dense/feed-forward at matched budget; the `random` sampler + a degree-preserving
+shuffle are the key controls. Then Phase 7 autonomous constraint-loop solver.
 
 ## Known issues / risks
 

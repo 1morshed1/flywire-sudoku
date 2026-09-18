@@ -15,6 +15,7 @@ where output ``[b, cell, d]`` scores placing digit ``d+1`` in ``cell``.
 """
 
 from .dense_snn import SudokuDenseSNN
+from .flywire_snn import FlyWireSNN
 from .mlp import SudokuMLP
 
-__all__ = ["SudokuDenseSNN", "SudokuMLP"]
+__all__ = ["FlyWireSNN", "SudokuDenseSNN", "SudokuMLP"]

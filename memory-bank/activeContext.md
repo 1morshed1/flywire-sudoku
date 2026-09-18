@@ -2,17 +2,16 @@
 
 ## Current focus
 
-Phases 0-4 done. Next: Phase 5 FlyWire-constrained SNN.
+Phases 0-5 done. Next: Phase 6 topology ablations (the science).
 
 ## Recent changes
 
-- Phase 3: dense SNN works (4×4 ~0.94), AMP verified on 2060.
-- Phase 4: `connectome/` pipeline. FAFB v783 via public GCS mirror
-  (gs://lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/fafb_783/),
-  no auth. Files: meta.feather (13MB), simple_edgelist.feather (302MB, cols
-  pre/post/count/norm/total_input). count≥5 → 135,453 nodes / 3.53M edges,
-  WCC 98.8%. Sparse scipy adjacency, transmitter signs, principled sampling.
-  11 tests pass. Data in data/flywire/ (gitignored) + provenance.json.
+- Phase 4: `connectome/` pipeline, FAFB v783, 135k nodes/3.5M edges (count≥5).
+- Phase 5: `models/flywire_snn.py` (FlyWireSNN) + `connectome/pipeline.py`
+  (subgraph API, lru_cached full graph). Recurrent LIF, W_eff = w_edge ⊙ A via
+  torch.sparse.mm. Wired into build_model ('flywire_snn') + TrainConfig
+  (n_neurons/sample_method/train_recurrent/use_signs). 50 tests pass. 4×4 real
+  1k subgraph ~0.93. VRAM: 20k=2.4GB → ~40k feasible on 6GB.
 
 ## Data facts (memorize)
 
@@ -21,15 +20,21 @@ Phases 0-4 done. Next: Phase 5 FlyWire-constrained SNN.
 - sensory seeds = super_class in {sensory, sensory_ascending} OR flow=='afferent'.
 - transmitters: acetylcholine +1; gaba/glutamate −1; amines +1; unknown +1.
 
-## Next steps (Phase 5)
+## Next steps (Phase 6 — topology ablations)
 
-1. `models/flywire_snn.py`: recurrent LIF SNN. Fixed sparse mask A from a sampled
-   subgraph (connectome.sampling); trainable recurrent weights W, W_eff = W ⊙ A.
-   Input projection (810→N) + recurrent FlyWire layer + output projection (N→729).
-   Use torch.sparse for the masked recurrent matmul. T=10, surrogate grads, AMP.
-2. Scale N=1k→5k→10k→20k; VRAM-benchmark each rung (log neurons/edges/VRAM/time).
-3. Reuse the supervised loop; extend build_model with 'flywire_snn' + connectome cfg.
-4. Optional: cache a built subgraph (connectome.adjacency.save) for fast reload.
+1. Topology controls at matched budget (PLAN.md §17-18): FlyWire vs
+   degree-preserving-shuffled FlyWire (the key null) vs uniform-random vs dense vs
+   feed-forward. Add a `degree_preserving_shuffle(adj)` (configuration model) — put
+   in connectome/ (e.g. topology.py) so build_model can swap the mask.
+2. `experiments/topology_ablation.py`: run each condition (multiple seeds), same
+   n_neurons/params, log move_acc/solve_rate + graph stats; compare FlyWire vs shuffle.
+3. Then Phase 7: autonomous constraint-propagation solve loop (sudoku env + model
+   scoring empty cells, place most-confident legal, repeat).
+
+## Notes
+
+- AMP kept OFF for flywire_snn (sparse.mm + autocast not verified); dense models use it.
+- flywire_snn learnability test is guarded on data/flywire/ presence (skips offline).
 
 ## Task-framing note
 

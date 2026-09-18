@@ -35,6 +35,11 @@ Core research question:
 gradient checkpointing.** Full 139k connectome is inference/eval only. This
 still yields a full scaling study + topology ablations = the real science.
 
+> **Update (Phase 5 measured):** the FlyWire SNN uses a *sparse* recurrent matmul,
+> so memory scales with edge count, not N². Measured on the RTX 2060 (batch 64,
+> T=10): 1k→59 MB, 5k→306 MB, 10k→795 MB, 20k→2.4 GB. Real trainable ceiling is
+> therefore ~40k neurons on 6 GB — higher than the dense estimate above.
+
 ---
 
 ## 2. Locked Design Decisions

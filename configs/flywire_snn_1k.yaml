@@ -1,0 +1,32 @@
+# FlyWire-constrained SNN, 1k neurons (PLAN.md Phase 5 / §6, Model 2).
+# Run: uv run --no-sync python -m training.supervised --config configs/flywire_snn_1k.yaml
+# Copy and change n_neurons for the 5k / 10k / 20k rungs of the scaling study.
+
+model: flywire_snn
+side: 9
+
+# Connectome mask
+n_neurons: 1000
+sample_method: top_degree   # top_degree | bfs | bfs_sensory | random(control only)
+conn_weight: count          # edge weight source for the fixed mask
+
+# Trainable regime (PLAN.md §19)
+train_recurrent: true       # false = Regime C (frozen connectome)
+use_signs: false            # true  = Regime B (Dale's-law signs)
+recurrent_scale: 1.0
+
+# Spiking sim
+T: 10
+encoding: constant
+
+# Data / optim
+n_train: 5000
+n_val: 1000
+difficulty: easy
+epochs: 40
+batch_size: 128
+lr: 0.001
+amp: false                  # sparse recurrent matmul: keep AMP off unless verified
+seed: 0
+device: auto
+log_every: 2

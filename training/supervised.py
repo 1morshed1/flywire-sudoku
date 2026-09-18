@@ -91,6 +91,13 @@ class TrainConfig:
     # Spiking-model options (ignored by the MLP):
     T: int = 10
     encoding: str = "constant"  # "constant" | "poisson"
+    # FlyWire-SNN options (used only when model == "flywire_snn"):
+    n_neurons: int = 1000
+    sample_method: str = "top_degree"  # top_degree | bfs | bfs_sensory | random
+    conn_weight: str = "count"  # edge weight source for the connectome mask
+    train_recurrent: bool = True  # False = Regime C (frozen connectome)
+    use_signs: bool = False  # True = Regime B (Dale's-law signs)
+    recurrent_scale: float = 1.0
     n_train: int = 5000
     n_val: int = 500
     difficulty: str = "easy"
@@ -115,6 +122,22 @@ def build_model(spec: SudokuSpec, cfg: TrainConfig) -> nn.Module:
         from models import SudokuDenseSNN
 
         return SudokuDenseSNN(spec, hidden=cfg.hidden, T=cfg.T, encoding=cfg.encoding)
+    if cfg.model == "flywire_snn":
+        from connectome.pipeline import subgraph
+        from models import FlyWireSNN
+
+        sub, signs = subgraph(
+            cfg.n_neurons, method=cfg.sample_method, weight=cfg.conn_weight, seed=cfg.seed
+        )
+        return FlyWireSNN(
+            spec,
+            sub,
+            T=cfg.T,
+            encoding=cfg.encoding,
+            train_recurrent=cfg.train_recurrent,
+            signs=signs if cfg.use_signs else None,
+            recurrent_scale=cfg.recurrent_scale,
+        )
     raise ValueError(f"unknown model {cfg.model!r}")
 
 

@@ -14,12 +14,30 @@ output: move logits     (B, num_cells, side)     # [b, cell, d] scores digit d+1
 |------|-------|-------|
 | `mlp.py` | `SudokuMLP` — feed-forward baseline (810→512→256→729 for 9×9) | 2 |
 | `dense_snn.py` | `SudokuDenseSNN` — feed-forward LIF spiking net (Norse) | 3 |
+| `flywire_snn.py` | `FlyWireSNN` — connectome-masked recurrent LIF SNN | 5 |
 
-## Coming (per phase)
+## FlyWire SNN notes
 
-| File | Model | Phase |
-|------|-------|-------|
-| `flywire_snn.py` | connectome-masked recurrent SNN | 5 |
+Recurrent LIF population whose connectivity is fixed to a FlyWire subgraph:
+`W_effective = w_edge ⊙ A` (A = fixed sparse mask). Input proj (810→N) + recurrent
+FlyWire layer + output proj (N→729) + LICell readout. The recurrent step is a single
+`torch.sparse.mm` (autograd on edge weights); memory scales with edge count, not N².
+
+Regimes (PLAN.md §19): `train_recurrent=True` (A), `use_signs=True` Dale's law (B),
+`train_recurrent=False` frozen connectome (C).
+
+### VRAM scaling on RTX 2060 (batch 64, T=10, top_degree subgraph)
+
+| N | edges | params | fwd+bwd | peak VRAM |
+|---|------:|-------:|--------:|----------:|
+| 1k | 22k | 1.6M | 34 ms | 59 MB |
+| 5k | 201k | 7.9M | 56 ms | 306 MB |
+| 10k | 470k | 15.9M | 138 ms | 795 MB |
+| 20k | 955k | 31.8M | 337 ms | 2.4 GB |
+
+Sparse recurrence is far lighter than the earlier dense estimate: 20k fits in 2.4 GB,
+so ~40k neurons is feasible on 6 GB. Learns the task — 4×4 real 1k subgraph reaches
+move_acc ~0.93.
 
 ## Dense SNN notes
 
