@@ -27,6 +27,8 @@ User leaning: not yet stated. Ask/confirm before implementing.
   erdos_renyi_like/dense/feedforward, matched N+edges). `topology` knob in
   build_model/TrainConfig. `experiments/topology_ablation.py` runner.
   57 tests pass. Structural signature: flywire recip 0.405 vs shuffled 0.038.
+  VRAM: measured ceiling ~20k neurons (2.4GB @ batch64); 30k+ OOM — torch.sparse.mm
+  backward makes a dense N×N grad. Scaling study caps ~20k without a custom autograd.
 
 ## Data facts (memorize)
 

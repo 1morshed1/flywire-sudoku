@@ -35,10 +35,14 @@ Core research question:
 gradient checkpointing.** Full 139k connectome is inference/eval only. This
 still yields a full scaling study + topology ablations = the real science.
 
-> **Update (Phase 5 measured):** the FlyWire SNN uses a *sparse* recurrent matmul,
-> so memory scales with edge count, not N². Measured on the RTX 2060 (batch 64,
-> T=10): 1k→59 MB, 5k→306 MB, 10k→795 MB, 20k→2.4 GB. Real trainable ceiling is
-> therefore ~40k neurons on 6 GB — higher than the dense estimate above.
+> **Update (Phase 5 measured):** the FlyWire SNN uses a *sparse* recurrent matmul.
+> Measured on the RTX 2060 (batch 64, T=10): 1k→59 MB, 5k→306 MB, 10k→795 MB,
+> 20k→2.4 GB. **Real trainable ceiling ≈ 20k neurons.** 30k+ OOMs even at batch 16,
+> because `torch.sparse.mm` **backward** allocates a dense N×N gradient for the sparse
+> weights (30k² × 4B ≈ 3.35 GB) — so the cap is O(N²) in the backward pass, not batch
+> or forward activations. Raising it past ~20k requires a custom sparse-gradient
+> autograd that only computes gradients at existing edges (future work). This matches
+> the original ~10k–20k estimate; the earlier "~40k" note was a bad extrapolation.
 
 ---
 

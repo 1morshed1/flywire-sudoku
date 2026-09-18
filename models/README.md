@@ -35,9 +35,11 @@ Regimes (PLAN.md §19): `train_recurrent=True` (A), `use_signs=True` Dale's law 
 | 10k | 470k | 15.9M | 138 ms | 795 MB |
 | 20k | 955k | 31.8M | 337 ms | 2.4 GB |
 
-Sparse recurrence is far lighter than the earlier dense estimate: 20k fits in 2.4 GB,
-so ~40k neurons is feasible on 6 GB. Learns the task — 4×4 real 1k subgraph reaches
-move_acc ~0.93.
+Measured trainable ceiling ≈ **20k neurons** (2.4 GB). 30k+ OOMs even at batch 16:
+`torch.sparse.mm` backward materializes a dense N×N gradient for the sparse weights
+(30k² × 4B ≈ 3.35 GB), so the cap is O(N²) in the backward pass, not batch. Past ~20k
+needs a custom sparse-gradient autograd (future work). Learns the task — 4×4 real 1k
+subgraph reaches move_acc ~0.93.
 
 ## Dense SNN notes
 

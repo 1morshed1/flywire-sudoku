@@ -36,8 +36,11 @@
   via torch.sparse.mm (autograd on edge weights, orientation test passes). 3 regimes
   (trainable/frozen/signs). Wired into train_supervised + build_model + config.
   50 tests pass. WORKS: 4×4 real 1k subgraph move_acc ~0.93 / solve_rate ~0.65.
-  VRAM scaling (RTX 2060, batch 64, T=10): 1k=59MB, 5k=306MB, 10k=795MB, 20k=2.4GB
-  — sparse recurrence → ~40k feasible (ceiling revised up from dense estimate).
+  VRAM scaling (RTX 2060, batch 64, T=10): 1k=59MB, 5k=306MB, 10k=795MB, 20k=2.4GB.
+  MEASURED trainable ceiling ≈ 20k. 30k+ OOMs even at batch 16 — torch.sparse.mm
+  BACKWARD makes a dense N×N gradient (30k²×4B≈3.35GB); cap is O(N²) backward, not
+  batch. Past ~20k needs a custom sparse-gradient autograd (future work). [Earlier
+  "~40k feasible" was a bad extrapolation — corrected.]
 - **Phase 6 topology ablations**: `connectome/topology.py` (degree_preserving_shuffle
   [key null, per-node in+out degree preserved exactly], erdos_renyi_like, dense,
   feedforward; all matched N + edge count). `topology`/`topology_seed` in TrainConfig +
@@ -73,8 +76,9 @@ legal digit, repeat). Uses sudoku env + a trained model; add evaluation/ metrics
 
 ## Known issues / risks
 
-- 6 GB VRAM ceiling: sparse recurrent SNN measured ~40k neurons trainable (20k=2.4GB);
-  much higher than the earlier dense estimate.
+- 6 GB VRAM ceiling: FlyWire-SNN measured ~20k neurons trainable (20k=2.4GB); 30k+ OOM
+  because torch.sparse.mm backward allocates a dense N×N gradient. Scaling study caps at
+  ~20k unless a custom sparse-gradient autograd is written (future work).
 - 4×4-easy ablation saturates (topology null); need harder regime for separation.
 - Norse resolved fine vs torch 2.5 on py3.12 (no fallback needed)
 - Random connectome subsample → dead islands (must use principled methods)

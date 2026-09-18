@@ -11,8 +11,11 @@ changes.
 
 ## Non-negotiables
 
-1. Hardware: RTX 2060 **6 GB**. Sparse FlyWire SNN measured ~40k neurons trainable
-   (20k = 2.4 GB @ batch 64, T=10); memory scales with edge count, not N². Full 139k =
+1. Hardware: RTX 2060 **6 GB**. Measured FlyWire-SNN trainable ceiling ≈ **20k neurons**
+   (20k = 2.4 GB @ batch 64, T=10). 30k+ OOMs even at batch 16 because
+   `torch.sparse.mm` backward materializes a **dense N×N** gradient for the sparse
+   weights (30k² × 4B ≈ 3.35 GB) — so the limit is O(N²) backward, not batch. Going
+   past ~20k needs a custom sparse-gradient autograd (future work). Full 139k =
    inference/eval only.
 2. Package manager: **uv**. Eyeball deps before install.
 3. Framework: **Norse** + torch CUDA 12.x. Pin versions at install.
