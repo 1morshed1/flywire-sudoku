@@ -45,3 +45,18 @@ uv run --no-sync python -m experiments.topology_ablation --config <cfg>.yaml
 Results are written to `results/topology_ablation.json` (gitignored) and printed as a
 per-condition summary (mean over seeds). Headline numbers are logged in
 `memory-bank/progress.md`.
+
+### First result (4×4 easy, N=1000, 30 epochs, 3 seeds)
+
+| topology | move_acc | solve_rate | reciprocity |
+|----------|---------:|-----------:|------------:|
+| flywire | 0.936 | 0.667 | 0.405 |
+| shuffled | 0.934 | 0.654 | 0.036 |
+| random | 0.934 | 0.651 | 0.023 |
+
+**Null result:** the topologies perform equally within seed noise (±0.01) despite a
+20× spread in reciprocity. On 4×4-easy the task **saturates** — any connected graph of
+matched degree suffices, so biological structure confers no measurable advantage here.
+Finding topology separation (if it exists) needs a harder or capacity-pressured regime:
+9×9, a smaller N, or fewer clues. Reported as-is — a negative result at saturation.
+

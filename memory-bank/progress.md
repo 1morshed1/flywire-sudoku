@@ -43,8 +43,13 @@
   feedforward; all matched N + edge count). `topology`/`topology_seed` in TrainConfig +
   build_model. `experiments/topology_ablation.py` runner (conditions × seeds → JSON +
   table). 7 topology tests pass (57 total). Structural signature: flywire reciprocity
-  0.405 vs shuffled 0.038 vs random 0.022 vs feedforward 0.000 (matched degree). Real
-  ablation numbers: see below when sweep completes.
+  0.405 vs shuffled 0.038 vs random 0.022 vs feedforward 0.000 (matched degree).
+  ABLATION RESULT (4×4 easy, N=1000, 30ep, 3 seeds): flywire move_acc 0.936 /
+  solve_rate 0.667; shuffled 0.934/0.654; random 0.934/0.651. NULL RESULT —
+  topologies equal within seed noise (±0.01) despite 20× reciprocity gap. 4×4 easy
+  SATURATES; any connected matched-degree graph learns it. Topology separation needs
+  a harder / capacity-pressured regime (9×9, or smaller N, or fewer clues). This is a
+  legit negative finding, not a bug.
 
 ## What's left
 
