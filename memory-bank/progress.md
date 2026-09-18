@@ -13,7 +13,12 @@
 - **Phase 2 MLP baseline**: `models/mlp.py` (SudokuMLP), `training/dataset.py` +
   `training/supervised.py` (masked CE over empty cells, move_acc + solve_rate,
   TrainConfig + YAML). 29 tests pass. Gate met: 4×4 easy move_acc ~0.94 /
-  solve_rate ~0.68 (2k puzzles, 40 epochs, CPU). 9×9 headline: TBD (running).
+  solve_rate ~0.68 (2k puzzles, 40 epochs, CPU).
+  9×9 easy baseline (5k puzzles, 30 epochs, RTX 2060, 257s): move_acc 0.29,
+  solve_rate 0.0, ~734k params — UNDERFIT, still climbing (loss 1.27→0.96).
+  Single-shot full-grid MLP is inherently weak on 9×9 (chance ~0.11, so 0.29 is
+  real learning); one-shot solve is not the goal — motivates the Phase 7 iterative
+  constraint-loop. Baseline = reference point, not a solver.
 
 ## What's left
 

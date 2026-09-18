@@ -30,10 +30,15 @@ uv run --no-sync python -c "from training.supervised import TrainConfig, train_m
 train_mlp(TrainConfig(side=4, n_train=2000, epochs=40, device='cpu'))"
 ```
 
-## Reference numbers
+## Reference numbers (MLP baseline)
 
 - 4×4, easy, 2k puzzles, 40 epochs, CPU: move_acc ≈ 0.94, solve_rate ≈ 0.68.
-- 9×9 headline numbers are logged in `memory-bank/progress.md` as runs complete.
+- 9×9, easy, 5k puzzles, 30 epochs, RTX 2060 (~257 s): move_acc ≈ 0.29,
+  solve_rate 0.0, ~734k params — **underfit and still climbing**. Single-shot
+  full-grid MLP is inherently weak on 9×9 (chance ≈ 0.11); one-shot solving is not
+  the objective. This is the reference the SNN / FlyWire models are compared to, and
+  it motivates the Phase 7 iterative constraint-propagation solve loop. More epochs /
+  data raise move_acc but single-pass solve_rate stays near zero — expected.
 
 Notes: `device: auto` uses the RTX 2060 when present. 9×9 dataset generation is the
 slow step (~40–60 ms/puzzle); build once and reuse for larger sweeps.
