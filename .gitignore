@@ -4,5 +4,7 @@ __pycache__/
 data/
 *.npz
 wandb/
+runs/
+checkpoints/
 .pytest_cache/
 .ruff_cache/

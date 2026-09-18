@@ -1,0 +1,19 @@
+# MLP baseline (PLAN.md Phase 2 / §6, Model 0).
+# Run: uv run --no-sync python -m training.supervised --config configs/mlp_baseline.yaml
+
+side: 9                 # board edge length (4 for fast debug, 9 for standard)
+hidden: [512, 256]      # hidden layer widths -> 810 -> 512 -> 256 -> 729
+dropout: 0.0
+
+n_train: 20000          # generated puzzles (9x9 gen ~40-60 ms each -> minutes to build)
+n_val: 2000
+difficulty: easy        # easy gives more clues -> cleaner supervised signal to start
+
+epochs: 40
+batch_size: 256
+lr: 0.001
+weight_decay: 0.0
+
+seed: 0
+device: auto            # 'auto' uses the RTX 2060 when available
+log_every: 2

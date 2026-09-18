@@ -2,22 +2,29 @@
 
 ## Current focus
 
-Phases 0-1 done. Next: Phase 2 MLP baseline.
+Phases 0-2 done. Next: Phase 3 dense SNN.
 
 ## Recent changes
 
-- Phase 0: `uv sync` OK — torch 2.5.1+cu124, norse 1.1.0, CUDA on RTX 2060 verified
-- Phase 1: `sudoku/` package (core/solver/generator/encoder/environment/renderer),
-  size-generic 4×4+9×9, 25 pytest passing, ruff clean
-- Fixed solver hang: guard solve/count_solutions against invalid boards
+- Phase 1: `sudoku/` package, size-generic 4×4+9×9, 25 tests, ruff clean
+- Phase 2: MLP baseline (`models/mlp.py`), supervised pipeline
+  (`training/dataset.py`, `training/supervised.py`), configs/mlp_baseline.yaml.
+  Task = full-grid move prediction, masked CE over empty cells. 29 tests pass.
+  Gate met: 4×4 move_acc ~0.94.
 
 ## Next steps
 
-1. Phase 2: MLP baseline — `models/mlp.py`, supervised training on next-move
-   labels from the solver. Gate: must work before touching FlyWire.
-2. Build the supervised data pipeline (board -> one-hot -> solver label).
-3. Decide Task A (9-way next-digit) vs Task B (729 place) for first baseline —
-   recommend Task A first (simpler, faster to validate pipeline).
+1. Phase 3: `models/dense_snn.py` — Norse LIF spiking net, same I/O contract.
+   Poisson-encode board (encoder.poisson_encode), T=10, surrogate gradients,
+   AMP + gradient checkpointing for VRAM. Reuse training/supervised loop.
+2. Add spike-rate readout -> logits; keep move_acc/solve_rate metrics.
+3. Get dense SNN working BEFORE any FlyWire connectome (Phase 4).
+
+## Task-framing note
+
+Chose full-grid prediction (input 810 one-hot -> logits 81×9, CE over empty cells)
+over single-cell Task A. Cleaner, gives move_acc + solve_rate directly, matches the
+729 head in PLAN.md §6. The env still supports next_digit (Task A) if needed later.
 
 ## Active decisions (locked)
 
