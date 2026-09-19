@@ -37,6 +37,19 @@ single-shot `solve_rate ≈ 0.68` but `completion_rate ≈ 0.98` through the loo
 placement changes the board and constraints, so later moves get easier. This is why the
 project's solve spine is the constraint loop, not one-shot prediction or RL.
 
+## Cross-model comparison (4×4 easy, 100 puzzles)
+
+| model | single-shot solve_rate | loop completion | placement_acc | mean steps |
+|-------|-----------------------:|----------------:|--------------:|-----------:|
+| MLP | 0.640 | 0.970 | 0.996 | 6.9 |
+| dense SNN | 0.510 | 0.960 | 0.993 | 6.9 |
+| FlyWire SNN (1k) | 0.705 | **1.000** | **1.000** | 7.0 |
+
+The constraint loop lifts every model to near-perfect (0.96–1.0), far above single-shot.
+The FlyWire-constrained SNN matches or edges out the unconstrained baselines — biological
+wiring is a fully viable substrate for the solver. (4×4-easy is near ceiling; ranking
+differences here are small.)
+
 ## Usage
 
 ```python

@@ -59,6 +59,9 @@
   stuck / steps / placement-accuracy). `train_supervised(..., return_model=True)` added.
   4 tests pass (oracle 100%, legal-only, clues untouched, metrics). RESULT: iterative
   loop >> single-shot — MLP 4×4 completion_rate 0.98 vs single-shot solve_rate 0.68.
+  CROSS-MODEL (4×4 easy, 100 puzzles, loop completion): MLP 0.970, dense_snn 0.960,
+  flywire_snn 1.000. Loop lifts all models to near-perfect; FlyWire SNN matches/edges
+  baselines — biological wiring is a viable solver substrate. (Near ceiling at 4×4.)
 - **Path A (topology separation hunt)**: N=200 4×4 easy (capacity bottleneck, 3 seeds):
   flywire solve_rate 0.605 / shuffled 0.595 / random 0.580 (move_acc all ~0.92). FAINT
   ordered hint — solve_rate tracks reciprocity order (flywire≥shuffled≥random) — but
