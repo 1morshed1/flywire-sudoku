@@ -73,6 +73,19 @@ def test_render_3d_writes_mp4(tmp_path):
     if not res.activity:
         return
     coords = rng.random((n, 3)) * 1000  # synthetic soma coords
-    out = render_solve_video_3d(res, spec, coords, tmp_path / "solve3d.mp4", fps=2)
+    regions = rng.choice(
+        ["sensory", "central_brain_intrinsic", "optic_lobe_intrinsic", "motor", None],
+        size=n,
+    ).tolist()
+    out = render_solve_video_3d(
+        res,
+        spec,
+        coords,
+        tmp_path / "solve3d.mp4",
+        adjacency=_toy_connectome(n).adj,
+        regions=regions,
+        fps=2,
+        frames_per_timestep=1,
+    )
     assert out.exists()
     assert out.stat().st_size > 0

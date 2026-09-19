@@ -84,6 +84,15 @@
   longer"): was averaging spikes over T (flat dark cloud, 4s). Now animates PER
   TIMESTEP — dim grey brain + bright cyan spiking-neuron overlay that blinks; frames =
   steps×T×frames_per_timestep + hold. Result: 25s, visible firing (~150 frames @ 6fps).
+- **Video Tier 2 FX upgrade (viral-demo style)**: black stage; neurons colored by
+  neuropil bucket (sensory/central/optic/motor via super_class); layered glow + white
+  hot core on firing neurons; ACTIVE SYNAPSE EDGES (Line3DCollection) from just-fired
+  neurons light up (real wiring); per-region firing-rate panel; dark board. Per-axis
+  tight bounds + proportional box_aspect(zoom=1.6) + repositioned 3D panel so the flat
+  fly-brain fills the frame. make_solve_video: --state (load/save model, skip retrain),
+  max_attempts (pick a solved puzzle), auto frames_per_timestep. 9×9 SUPPORTED: flywire
+  9×9 solves 65% via loop (placement_acc 0.987), so 9×9 video renders a solved puzzle.
+  4 video tests pass; 4×4 FX frame verified good.
 
 ## What's left
 

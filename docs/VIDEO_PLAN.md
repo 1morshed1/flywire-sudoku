@@ -8,6 +8,18 @@ Soma coordinates come from the FlyWire annotations TSV (soma_x/y/z, `connectome/
 coordinates.py`), fetched by `connectome.download.ensure_coordinates` (~31 MB). All
 1000 subgraph neurons have coordinates. Outputs gitignored (regenerable).
 
+**Tier 2 FX (viral-demo style):** black stage; neurons colored by neuropil bucket
+(sensory/central/optic/motor from `super_class`); firing neurons flare with layered
+glow + white hot core; active synapse edges from just-fired neurons light up (signal
+propagating through the real wiring); a per-region firing-rate panel; per-axis tight
+bounds + proportional box aspect so the flat fly-brain fills the frame.
+
+**9×9:** supported. The FlyWire SNN solves ~65% of 9×9 easy puzzles via the loop
+(placement accuracy 0.987); `make_solve_video(max_attempts=...)` picks a solved puzzle.
+Reuse a trained model with `--state <path>` to skip retraining. Example:
+`python -m evaluation.visualization --tier 2 --side 9 --state results/flywire9_state.pt --device cuda --out results/flywire_fx_9x9.mp4`
+→ ~50 s clip (29 solve steps), results/flywire_fx_9x9.mp4.
+
 **Goal:** a video showing the FlyWire-constrained SNN solving a Sudoku puzzle —
 the board filling in step by step, synchronized with the connectome's neurons firing.
 

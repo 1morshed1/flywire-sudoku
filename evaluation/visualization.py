@@ -28,10 +28,22 @@ from sudoku.core import SudokuSpec
 plt.rcParams["animation.ffmpeg_path"] = imageio_ffmpeg.get_ffmpeg_exe()
 
 
-def _draw_board(ax, spec: SudokuSpec, board: np.ndarray, highlight: tuple[int, int] | None):
+def _draw_board(
+    ax,
+    spec: SudokuSpec,
+    board: np.ndarray,
+    highlight: tuple[int, int] | None,
+    *,
+    dark: bool = False,
+):
     """Draw the Sudoku grid with digits, box lines, and an optional highlighted cell."""
     side = spec.side
+    line_c = "white" if dark else "black"
+    text_c = "white" if dark else "black"
+    hi_c = "#3a5bd9" if dark else "#ffe08a"
     ax.clear()
+    if dark:
+        ax.set_facecolor("black")
     ax.set_xlim(0, side)
     ax.set_ylim(0, side)
     ax.set_aspect("equal")
@@ -41,14 +53,15 @@ def _draw_board(ax, spec: SudokuSpec, board: np.ndarray, highlight: tuple[int, i
 
     if highlight is not None:
         r, c = highlight
-        ax.add_patch(plt.Rectangle((c, r), 1, 1, color="#ffe08a", zorder=0))
+        ax.add_patch(plt.Rectangle((c, r), 1, 1, color=hi_c, zorder=0))
 
     for i in range(side + 1):
         lw = 2.2 if i % spec.box_rows == 0 else 0.6
-        ax.axhline(i, color="black", lw=lw)
+        ax.axhline(i, color=line_c, lw=lw)
         lw = 2.2 if i % spec.box_cols == 0 else 0.6
-        ax.axvline(i, color="black", lw=lw)
+        ax.axvline(i, color=line_c, lw=lw)
 
+    fs = 16 if side <= 4 else 11
     for r in range(side):
         for c in range(side):
             v = int(board[r, c])
@@ -59,9 +72,43 @@ def _draw_board(ax, spec: SudokuSpec, board: np.ndarray, highlight: tuple[int, i
                     str(v),
                     ha="center",
                     va="center",
-                    fontsize=16,
+                    fontsize=fs,
                     fontweight="bold",
+                    color=text_c,
                 )
+
+
+# Neuropil buckets for coloring + the per-region activity panel (super_class -> bucket).
+_REGION_BUCKETS: dict[str, str] = {
+    "sensory": "sensory",
+    "sensory_ascending": "sensory",
+    "central_brain_intrinsic": "central",
+    "optic_lobe_intrinsic": "optic",
+    "visual_projection": "optic",
+    "visual_centrifugal": "optic",
+    "ascending": "motor",
+    "descending": "motor",
+    "motor": "motor",
+}
+_BUCKET_ORDER = ["sensory", "central", "optic", "motor", "other"]
+_BUCKET_COLORS = {
+    "sensory": "#00e5ff",
+    "central": "#ffb300",
+    "optic": "#ff4fd8",
+    "motor": "#7cff6b",
+    "other": "#9aa0a6",
+}
+
+
+def _buckets_for(regions: list[str] | None, n: int) -> np.ndarray:
+    """Map each neuron's super_class to a bucket index (into _BUCKET_ORDER)."""
+    idx = {b: i for i, b in enumerate(_BUCKET_ORDER)}
+    if regions is None:
+        return np.full(n, idx["other"], dtype=np.int64)
+    return np.array(
+        [idx.get(_REGION_BUCKETS.get(r or "", "other"), idx["other"]) for r in regions],
+        dtype=np.int64,
+    )
 
 
 def _top_neurons(activity: list[np.ndarray], k: int) -> np.ndarray:
@@ -133,41 +180,67 @@ def render_solve_video_3d(
     coords: np.ndarray,
     out_path: str | Path,
     *,
+    adjacency=None,
+    regions: list[str] | None = None,
     fps: int = 6,
     frames_per_timestep: int = 2,
-    fire_color: str = "#00e5ff",
+    max_edges: int = 1200,
     title: str = "FlyWire brain solving Sudoku",
 ) -> Path:
-    """Tier-2 render: 3D neurons in real soma coordinates blinking as they spike.
+    """Tier-2 render (full FX): a connectome "playing Sudoku" in the viral-demo style.
 
-    One video frame per *simulation timestep* (not per solve step), so the recurrent
-    population visibly fires: a dim grey point cloud shows the whole brain, and neurons
-    that spike at the current timestep light up bright and large. The board (right)
-    reveals each placement on the final timestep of that solve step.
+    One video frame per *simulation timestep*. On a black stage:
+    * a dim point cloud of the whole recurrent population, colored by neuropil region;
+    * neurons spiking **now** flare with a layered glow (bloom) in their region color;
+    * **active synapse edges** (outgoing from neurons that just fired) light up, so
+      signal is seen propagating through the real wiring;
+    * a **per-region activity panel** shows the live firing rate of each neuropil bucket;
+    * the Sudoku board reveals each placement on the last timestep of its solve step.
 
-    ``coords`` is ``(N, 3)`` aligned to the population; NaN rows are dropped.
-    ``frames_per_timestep`` repeats each timestep to slow the video down; raise it (or
-    lower ``fps``) for a slower, longer clip.
+    ``coords`` is ``(N, 3)`` aligned to the population; ``adjacency`` is the subgraph's
+    sparse matrix (for edges); ``regions`` is the per-neuron ``super_class``. NaN-coord
+    neurons are dropped.
     """
     if not result.activity:
         raise ValueError("result has no activity; solve with capture_activity=True")
+    from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
     finite = np.isfinite(coords).all(axis=1)
     xyz = coords[finite]
-    acts = [a[:, finite] for a in result.activity]  # each (T, n_finite) binary spikes
+    acts = [a[:, finite] for a in result.activity]  # (T, n_finite) binary spikes
     n_t = acts[0].shape[0]
     n_steps = len(result.placements)
 
-    # One entry per (solve step, timestep), each repeated frames_per_timestep times,
-    # plus a hold on the final solved board.
-    plan = [(s, t) for s in range(n_steps) for t in range(n_t) for _ in range(frames_per_timestep)]
-    plan += [(n_steps - 1, n_t - 1)] * (fps * 2)  # ~2 s hold at the end
+    buckets = _buckets_for(regions, coords.shape[0])[finite]
+    bucket_rgba = np.array([_BUCKET_COLORS[_BUCKET_ORDER[b]] for b in buckets])
 
-    fig = plt.figure(figsize=(12, 6))
-    ax3d = fig.add_subplot(1, 2, 1, projection="3d")
-    ax_board = fig.add_subplot(1, 2, 2)
-    fig.suptitle(title, fontsize=14, fontweight="bold")
-    fig.patch.set_facecolor("white")
+    # Per-axis tight bounds + proportional box aspect so the (flat, wide) fly brain
+    # fills the panel in its natural shape instead of a tiny cube.
+    lo, hi = xyz.min(0), xyz.max(0)
+    ext = np.maximum(hi - lo, 1e-6)
+    box_aspect = ext / ext.max()
+
+    # Precompute edge endpoints among finite neurons (remap to finite-local indices).
+    seg_pre = seg_post = None
+    if adjacency is not None:
+        remap = -np.ones(coords.shape[0], dtype=np.int64)
+        remap[np.flatnonzero(finite)] = np.arange(finite.sum())
+        coo = adjacency.tocoo()
+        keep = finite[coo.row] & finite[coo.col]
+        seg_pre = remap[coo.row[keep]]
+        seg_post = remap[coo.col[keep]]
+
+    plan = [(s, t) for s in range(n_steps) for t in range(n_t) for _ in range(frames_per_timestep)]
+    plan += [(n_steps - 1, n_t - 1)] * (fps * 2)  # end hold
+
+    fig = plt.figure(figsize=(13, 7), facecolor="black")
+    gs = fig.add_gridspec(2, 2, width_ratios=[2, 1], height_ratios=[3, 1])
+    ax3d = fig.add_subplot(gs[:, 0], projection="3d")
+    ax3d.set_position([0.0, 0.02, 0.62, 0.9])  # fill the left region, minimal margin
+    ax_board = fig.add_subplot(gs[0, 1])
+    ax_reg = fig.add_subplot(gs[1, 1])
+    fig.suptitle(title, fontsize=15, fontweight="bold", color="white")
+    rng = np.random.default_rng(0)
 
     def draw(idx: int):
         s, t = plan[idx]
@@ -175,35 +248,83 @@ def render_solve_video_3d(
 
         ax3d.clear()
         ax3d.set_axis_off()
-        # Dim grey cloud = the whole recurrent population (the brain shape).
-        ax3d.scatter(xyz[:, 0], xyz[:, 1], xyz[:, 2], c="#c9c9c9", s=3, alpha=0.18, linewidths=0)
-        # Bright overlay = neurons spiking right now.
-        if fire.any():
-            ax3d.scatter(
-                xyz[fire, 0],
-                xyz[fire, 1],
-                xyz[fire, 2],
-                c=fire_color,
-                s=30,
-                alpha=0.95,
-                linewidths=0,
-            )
-        azim = -70 + 150 * (idx / max(len(plan) - 1, 1))  # slow rotate over the clip
-        ax3d.view_init(elev=18, azim=azim)
-        ax3d.set_title(f"step {s + 1}/{n_steps} · t={t + 1}/{n_t} · {int(fire.sum())} firing")
+        ax3d.set_facecolor("black")
+        ax3d.set_xlim(lo[0], hi[0])
+        ax3d.set_ylim(lo[1], hi[1])
+        ax3d.set_zlim(lo[2], hi[2])
+        ax3d.set_box_aspect(box_aspect, zoom=1.6)
+        # Dim region-colored cloud = the whole population.
+        ax3d.scatter(xyz[:, 0], xyz[:, 1], xyz[:, 2], c=bucket_rgba, s=4, alpha=0.16, linewidths=0)
 
-        # Board: pre-placement board while computing; reveal the placement on last t.
+        # Active synapse edges: outgoing from neurons firing now.
+        if seg_pre is not None and fire.any():
+            active = fire[seg_pre]
+            ap, aq = seg_pre[active], seg_post[active]
+            if ap.size > max_edges:
+                sel = rng.choice(ap.size, max_edges, replace=False)
+                ap, aq = ap[sel], aq[sel]
+            if ap.size:
+                segs = np.stack([xyz[ap], xyz[aq]], axis=1)
+                lc = Line3DCollection(segs, colors=bucket_rgba[ap], linewidths=0.5, alpha=0.28)
+                ax3d.add_collection3d(lc)
+
+        # Firing neurons with layered glow (bloom) + a white-hot core.
+        if fire.any():
+            fx = xyz[fire]
+            fc = bucket_rgba[fire]
+            for size, alpha in ((190, 0.06), (95, 0.14), (42, 0.35), (18, 0.85)):
+                ax3d.scatter(fx[:, 0], fx[:, 1], fx[:, 2], c=fc, s=size, alpha=alpha, linewidths=0)
+            ax3d.scatter(fx[:, 0], fx[:, 1], fx[:, 2], c="white", s=5, alpha=0.9, linewidths=0)
+
+        azim = -70 + 150 * (idx / max(len(plan) - 1, 1))
+        ax3d.view_init(elev=18, azim=azim)
+        ax3d.set_title(
+            f"step {s + 1}/{n_steps} · t={t + 1}/{n_t} · {int(fire.sum())} firing",
+            color="white",
+            fontsize=11,
+        )
+
+        # Board.
         last_t = t == n_t - 1
         board = result.trajectory[s + 1] if last_t else result.trajectory[s]
         highlight = result.placements[s][:2] if last_t else None
-        _draw_board(ax_board, spec, board, highlight)
+        _draw_board(ax_board, spec, board, highlight, dark=True)
         p = result.placements[s]
-        ax_board.set_title(f"placed ({p[0]},{p[1]}) = {p[2]}" if last_t else "computing…")
+        ax_board.set_title(
+            f"placed ({p[0]},{p[1]}) = {p[2]}" if last_t else "computing…",
+            color="white",
+            fontsize=10,
+        )
+
+        # Per-region activity panel: instantaneous firing rate per bucket.
+        ax_reg.clear()
+        ax_reg.set_facecolor("black")
+        rates = []
+        labels = []
+        colors = []
+        for b, name in enumerate(_BUCKET_ORDER):
+            mask = buckets == b
+            if mask.sum() == 0:
+                continue
+            rates.append(float(fire[mask].mean()))
+            labels.append(name)
+            colors.append(_BUCKET_COLORS[name])
+        ypos = np.arange(len(labels))
+        ax_reg.barh(ypos, rates, color=colors)
+        ax_reg.set_yticks(ypos)
+        ax_reg.set_yticklabels(labels, color="white", fontsize=8)
+        ax_reg.set_xlim(0, 1)
+        ax_reg.tick_params(colors="white")
+        ax_reg.set_title("region firing rate", color="white", fontsize=10)
+        for spine in ax_reg.spines.values():
+            spine.set_color("#444444")
 
     anim = FuncAnimation(fig, draw, frames=len(plan), interval=1000 / fps)
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    anim.save(str(out), writer=FFMpegWriter(fps=fps, bitrate=2800))
+    anim.save(
+        str(out), writer=FFMpegWriter(fps=fps, bitrate=4000), savefig_kwargs={"facecolor": "black"}
+    )
     plt.close(fig)
     return out
 
@@ -215,20 +336,27 @@ def make_solve_video(
     side: int = 4,
     n_neurons: int = 1000,
     epochs: int = 40,
+    n_train: int = 2000,
     difficulty: str = "easy",
     seed: int = 0,
     device: str = "cpu",
+    state_path: str | None = None,
+    max_attempts: int = 30,
 ) -> Path:
-    """Train a FlyWire SNN, solve one puzzle capturing activity, and render the video.
+    """Train (or load) a FlyWire SNN, solve one puzzle capturing activity, render video.
 
-    ``tier=1`` renders board + spike raster (no extra data). ``tier=2`` renders a 3D
-    fly-brain in real soma coordinates (fetches the annotations file).
+    ``tier=1`` renders board + spike raster; ``tier=2`` renders the 3D fly-brain in real
+    soma coordinates. ``state_path`` loads a saved model instead of training (and, after
+    training, the freshly trained weights are saved there). Up to ``max_attempts``
+    puzzles are tried so the rendered puzzle is one the model actually solves (important
+    for 9×9, where the loop solves ~65%).
     """
     import numpy as np
+    import torch
 
     from evaluation.solver_loop import solve_with_model
     from sudoku import SudokuSpec, make_puzzle
-    from training.supervised import TrainConfig, train_supervised
+    from training.supervised import TrainConfig, build_model, train_supervised
 
     spec = SudokuSpec.from_side(side)
     cfg = TrainConfig(
@@ -236,38 +364,62 @@ def make_solve_video(
         side=side,
         n_neurons=n_neurons,
         T=10,
-        n_train=2000,
+        n_train=n_train,
         n_val=200,
         difficulty=difficulty,
         epochs=epochs,
-        batch_size=64,
+        batch_size=256,
         lr=1e-3,
         seed=seed,
         device=device,
     )
-    _, model = train_supervised(cfg, verbose=False, return_model=True)
+    if state_path and Path(state_path).exists():
+        model = build_model(spec, cfg).to(device)
+        model.load_state_dict(torch.load(state_path, map_location=device))
+    else:
+        _, model = train_supervised(cfg, verbose=False, return_model=True)
+        if state_path:
+            torch.save(model.state_dict(), state_path)
 
     rng = np.random.default_rng(seed + 100)
-    puz = make_puzzle(spec, rng, difficulty)
-    result = solve_with_model(
-        model,
-        spec,
-        puz.puzzle,
-        device=device,
-        solution=puz.solution,
-        capture_activity=True,
-    )
+    result = None
+    for _ in range(max_attempts):
+        puz = make_puzzle(spec, rng, difficulty)
+        result = solve_with_model(
+            model,
+            spec,
+            puz.puzzle,
+            device=device,
+            solution=puz.solution,
+            capture_activity=True,
+        )
+        if result.solved:
+            break
 
     if tier == 2:
         from connectome.coordinates import neuron_coordinates
-        from connectome.pipeline import subgraph
+        from connectome.pipeline import full_connectome, subgraph
 
         # Reproduce the exact node order the model was built with (same cfg.seed).
         sub, _ = subgraph(
             n_neurons, method=cfg.sample_method, weight=cfg.conn_weight, seed=cfg.seed
         )
         coords = neuron_coordinates(sub.node_ids)
-        path = render_solve_video_3d(result, spec, coords, out_path)
+        # Region (super_class) per neuron, aligned to the subgraph node order.
+        meta, _ = full_connectome(weight=cfg.conn_weight)
+        sc = dict(zip(meta["fafb_783_id"].to_list(), meta["super_class"].to_list()))
+        regions = [sc.get(nid) for nid in sub.node_ids]
+        # Keep the clip a sane length: fewer repeats per timestep when many solve steps.
+        fpt = 1 if result.steps > 15 else 2
+        path = render_solve_video_3d(
+            result,
+            spec,
+            coords,
+            out_path,
+            adjacency=sub.adj,
+            regions=regions,
+            frames_per_timestep=fpt,
+        )
     else:
         path = render_solve_video(result, spec, out_path)
     print(f"tier={tier} solved={result.solved} steps={result.steps} -> {path}")
@@ -283,7 +435,9 @@ if __name__ == "__main__":  # pragma: no cover - CLI entry point
     parser.add_argument("--side", type=int, default=4)
     parser.add_argument("--n-neurons", type=int, default=1000)
     parser.add_argument("--epochs", type=int, default=40)
+    parser.add_argument("--n-train", type=int, default=2000)
     parser.add_argument("--device", default="cpu")
+    parser.add_argument("--state", default=None, help="load/save model state_dict here")
     args = parser.parse_args()
     make_solve_video(
         args.out,
@@ -291,5 +445,7 @@ if __name__ == "__main__":  # pragma: no cover - CLI entry point
         side=args.side,
         n_neurons=args.n_neurons,
         epochs=args.epochs,
+        n_train=args.n_train,
         device=args.device,
+        state_path=args.state,
     )
