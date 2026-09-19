@@ -1,6 +1,9 @@
 # Video Simulation Plan — Fly Brain Solving Sudoku
 
-**Status:** planned, not started. Pick up later (needs Phase 7 solver first).
+**Status:** Tier 1 DONE. `evaluation/visualization.py` renders an mp4 of the FlyWire
+SNN solving 4×4 (board fills in ‖ spike raster). Build it with:
+`uv run --no-sync python -m evaluation.visualization --out results/flywire_solve.mp4`
+Output is gitignored (regenerable). Tier 2 (3D real soma coords) still open — see below.
 
 **Goal:** a video showing the FlyWire-constrained SNN solving a Sudoku puzzle —
 the board filling in step by step, synchronized with the connectome's neurons firing.

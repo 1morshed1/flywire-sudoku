@@ -55,6 +55,7 @@ differences here are small.)
 ```python
 from evaluation.metrics import evaluate_solver
 from sudoku import SudokuSpec
+
 # model = a trained SudokuMLP / SudokuDenseSNN / FlyWireSNN
 evaluate_solver(model, SudokuSpec.from_side(4), n_puzzles=50, difficulty="easy")
 ```

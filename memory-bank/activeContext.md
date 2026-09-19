@@ -2,9 +2,16 @@
 
 ## Current focus
 
-Phases 0-7 done. Paths A + B both executed (user chose "both"). All 8 planned phases
-complete. Remaining optional work: video (docs/VIDEO_PLAN.md), deeper Path-A regimes
-(9×9 / larger N), RL polish. Await user steer on which, if any.
+Phases 0-7 done + video Tier 1 done. Remaining optional: video Tier 2 (3D real soma
+coords), deeper Path-A regimes (9×9 / larger N), RL polish. Await user steer.
+
+## Video (Tier 1) — done
+
+`evaluation/visualization.py`: render_solve_video + make_solve_video CLI. FlyWireSNN
+forward has return_activity; solve_with_model has capture_activity. Renders board ‖
+spike raster to mp4 (results/, gitignored). Build:
+`uv run --no-sync python -m evaluation.visualization`. Tier 2 = 3D soma coords (needs
+fetching a coordinate file; meta.feather has no xyz).
 
 ## Paths A + B outcomes (done)
 

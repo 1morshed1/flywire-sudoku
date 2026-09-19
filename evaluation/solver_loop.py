@@ -37,6 +37,7 @@ class SolveResult:
     trajectory: list[np.ndarray] = field(default_factory=list)  # board after each step
     placements: list[tuple[int, int, int]] = field(default_factory=list)  # (r, c, digit)
     correct_placements: int = 0  # matched the reference solution (if provided)
+    activity: list[np.ndarray] = field(default_factory=list)  # per step: spikes (T, N)
 
 
 @torch.no_grad()
@@ -49,6 +50,7 @@ def solve_with_model(
     solution: np.ndarray | None = None,
     max_steps: int | None = None,
     record_trajectory: bool = True,
+    capture_activity: bool = False,
 ) -> SolveResult:
     """Solve ``board`` autonomously with ``model`` via the constraint-propagation loop.
 
@@ -59,6 +61,10 @@ def solve_with_model(
         to count ``correct_placements`` (a per-move accuracy under the greedy policy).
     max_steps:
         Safety cap; defaults to the number of empty cells.
+    capture_activity:
+        If True, record each step's recurrent spike tensor ``(T, N)`` into
+        ``result.activity`` (model must accept ``return_activity=True``, e.g. FlyWireSNN).
+        Used to render the solve video (docs/VIDEO_PLAN.md).
     """
     device = torch.device(device)
     model.eval()
@@ -79,7 +85,12 @@ def solve_with_model(
             break
 
         x = torch.from_numpy(one_hot(spec, work, flatten=True)).unsqueeze(0).to(device)
-        logits = model(x)[0].reshape(-1).cpu()  # (num_cells * side,)
+        if capture_activity:
+            out, spikes_txn = model(x, return_activity=True)  # (T, 1, N)
+            result.activity.append(spikes_txn[:, 0, :].cpu().numpy())
+        else:
+            out = model(x)
+        logits = out[0].reshape(-1).cpu()  # (num_cells * side,)
         logits[~torch.from_numpy(mask)] = float("-inf")
 
         action = int(torch.argmax(logits))

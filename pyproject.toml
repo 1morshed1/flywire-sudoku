@@ -41,6 +41,7 @@ dependencies = [
     "pyyaml>=6.0",           # config-driven runs
     "tqdm>=4.66",            # progress bars
     "matplotlib>=3.9",       # metrics + spike-raster + board visualization
+    "imageio-ffmpeg>=0.5",   # bundled ffmpeg binary for mp4 encoding (video render)
 ]
 
 [dependency-groups]

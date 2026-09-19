@@ -138,24 +138,35 @@ class FlyWireSNN(nn.Module):
         # sparse (N,N) @ dense (N,B) -> (N,B); transpose back to (B,N).
         return torch.sparse.mm(wt, spikes.t()).t()
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Run the T-step recurrent simulation; return logits ``(B, num_cells, side)``."""
+    def forward(
+        self, x: torch.Tensor, return_activity: bool = False
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
+        """Run the T-step recurrent simulation; return logits ``(B, num_cells, side)``.
+
+        When ``return_activity=True`` also returns the recurrent-population spike tensor
+        ``(T, B, N)`` for visualization (PLAN §Phase 8 / docs/VIDEO_PLAN.md).
+        """
         b = x.shape[0]
         lif_state = None
         read_state = None
         spikes = torch.zeros(b, self.N, device=x.device, dtype=x.dtype)
         voltage_sum = torch.zeros(b, self.out_features, device=x.device, dtype=x.dtype)
+        activity: list[torch.Tensor] = []
 
         for _ in range(self.T):
             inp_cur = self.input_linear(self._encode(x))
             rec_cur = self._recurrent_current(spikes)
             spikes, lif_state = self.lif(inp_cur + rec_cur, lif_state)
+            if return_activity:
+                activity.append(spikes.detach())
             out = self.output_linear(spikes)
             v, read_state = self.readout(out, read_state)
             voltage_sum = voltage_sum + v
 
-        logits = voltage_sum / self.T
-        return logits.view(-1, self.spec.num_cells, self.spec.num_digits)
+        logits = (voltage_sum / self.T).view(-1, self.spec.num_cells, self.spec.num_digits)
+        if return_activity:
+            return logits, torch.stack(activity)  # (T, B, N)
+        return logits
 
     def num_parameters(self) -> int:
         """Total trainable parameter count."""
