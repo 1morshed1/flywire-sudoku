@@ -53,6 +53,14 @@
   SATURATES; any connected matched-degree graph learns it. Topology separation needs
   a harder / capacity-pressured regime (9×9, or smaller N, or fewer clues). This is a
   legit negative finding, not a bug.
+- **Phase 7 autonomous solver**: `evaluation/solver_loop.py` (solve_with_model +
+  SolveResult; constraint-propagation loop, legal-masked greedy placement, records
+  trajectory for the video) + `evaluation/metrics.py` (evaluate_solver: completion /
+  stuck / steps / placement-accuracy). `train_supervised(..., return_model=True)` added.
+  4 tests pass (oracle 100%, legal-only, clues untouched, metrics). RESULT: iterative
+  loop >> single-shot — MLP 4×4 completion_rate 0.98 vs single-shot solve_rate 0.68.
+- **Path A (topology separation hunt)**: capacity-pressured ablation regimes being run
+  (N=200 4×4 first). Results logged when done.
 
 ## What's left
 
@@ -65,7 +73,7 @@
 | 4 FlyWire Codex → sparse COO + sampling | **DONE** | FAFB v783; 135k nodes/3.5M edges |
 | 5 FlyWire-SNN scale 1k→20k | **DONE** | works (4×4 ~0.93); VRAM benchmarked, ~40k feasible |
 | 6 topology ablations | **DONE** | topology controls + ablation runner; degree-shuffle null verified |
-| 7 autonomous constraint loop (+ opt RL) | pending | GPU |
+| 7 autonomous constraint loop | **DONE** | solver loop + metrics; MLP completion 0.98 vs 0.68 single-shot |
 
 ## Current status
 

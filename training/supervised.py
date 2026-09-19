@@ -147,12 +147,21 @@ def build_model(spec: SudokuSpec, cfg: TrainConfig) -> nn.Module:
     raise ValueError(f"unknown model {cfg.model!r}")
 
 
-def train_supervised(cfg: TrainConfig, *, verbose: bool = True) -> dict[str, float]:
+def train_supervised(
+    cfg: TrainConfig, *, verbose: bool = True, return_model: bool = False
+) -> dict[str, float] | tuple[dict[str, float], nn.Module]:
     """Train any model with the shared contract; return final validation metrics.
 
     Model-agnostic: dispatches on ``cfg.model``. Optional AMP (mixed precision) is
     used only on CUDA and helps the spiking models fit the 6 GB budget (PLAN.md §R4).
     Kept dependency-light (no W&B) so it runs anywhere.
+
+    Parameters
+    ----------
+    return_model:
+        If True, return ``(metrics, model)`` so callers (e.g. the Phase 7 solver
+        evaluation) can use the trained network directly. The model stays on its
+        training device.
     """
     torch.manual_seed(cfg.seed)
     spec = SudokuSpec.from_side(cfg.side)
@@ -196,6 +205,8 @@ def train_supervised(cfg: TrainConfig, *, verbose: bool = True) -> dict[str, flo
             )
 
     metrics["params"] = float(model.num_parameters())
+    if return_model:
+        return metrics, model
     return metrics
 
 
