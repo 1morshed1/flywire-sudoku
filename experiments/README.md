@@ -60,3 +60,17 @@ matched degree suffices, so biological structure confers no measurable advantage
 Finding topology separation (if it exists) needs a harder or capacity-pressured regime:
 9×9, a smaller N, or fewer clues. Reported as-is — a negative result at saturation.
 
+### Capacity-pressured regime (N=200, 4×4 easy, 3 seeds)
+
+| topology | move_acc | solve_rate | reciprocity |
+|----------|---------:|-----------:|------------:|
+| flywire | 0.921 | 0.605 | 0.605 |
+| shuffled | 0.920 | 0.595 | 0.060 |
+| random | 0.919 | 0.580 | 0.044 |
+
+**Faint ordered hint:** with only 200 neurons, solve_rate follows the reciprocity
+ordering (flywire ≥ shuffled ≥ random). But the flywire−random gap (0.025) is smaller
+than the per-condition seed spread (~0.085), so it is **not significant at 3 seeds**.
+A higher-seed power test is running to confirm or bury it. Interpretation stands: no
+established separation yet, but the direction is suggestive under capacity pressure.
+

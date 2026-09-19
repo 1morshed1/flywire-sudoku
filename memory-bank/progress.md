@@ -59,8 +59,11 @@
   stuck / steps / placement-accuracy). `train_supervised(..., return_model=True)` added.
   4 tests pass (oracle 100%, legal-only, clues untouched, metrics). RESULT: iterative
   loop >> single-shot — MLP 4×4 completion_rate 0.98 vs single-shot solve_rate 0.68.
-- **Path A (topology separation hunt)**: capacity-pressured ablation regimes being run
-  (N=200 4×4 first). Results logged when done.
+- **Path A (topology separation hunt)**: N=200 4×4 easy (capacity bottleneck, 3 seeds):
+  flywire solve_rate 0.605 / shuffled 0.595 / random 0.580 (move_acc all ~0.92). FAINT
+  ordered hint — solve_rate tracks reciprocity order (flywire≥shuffled≥random) — but
+  gap (0.025) < seed spread (0.085), NOT significant at 3 seeds. Running an 8-seed power
+  test to confirm/bury the trend. Still essentially null; direction is suggestive.
 
 ## What's left
 
