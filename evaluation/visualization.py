@@ -254,7 +254,7 @@ def render_solve_video_3d(
         ax3d.set_xlim(lo[0], hi[0])
         ax3d.set_ylim(lo[1], hi[1])
         ax3d.set_zlim(lo[2], hi[2])
-        ax3d.set_box_aspect(box_aspect, zoom=1.5)
+        ax3d.set_box_aspect(box_aspect, zoom=1.1)  # zoomed out so the whole brain fits
 
         # Dense soma mist = the whole fly brain (the recognizable anatomy + 3D depth).
         if bg_coords is not None:
@@ -291,9 +291,8 @@ def render_solve_video_3d(
                 ax3d.scatter(fx[:, 0], fx[:, 1], fx[:, 2], c=fc, s=size, alpha=alpha, linewidths=0)
             ax3d.scatter(fx[:, 0], fx[:, 1], fx[:, 2], c="white", s=3, alpha=0.9, linewidths=0)
 
-        # Frontal view (fly-brain face) with a gentle parallax swing for 3D feel.
-        azim = -90 + 14 * np.sin(2 * np.pi * idx / max(len(plan) - 1, 1))
-        ax3d.view_init(elev=80, azim=azim)
+        # Fixed frontal view of the fly-brain face (no rotation).
+        ax3d.view_init(elev=80, azim=-90)
         ax3d.set_title(
             f"step {s + 1}/{n_steps} · t={t + 1}/{n_t} · {int(fire.sum())} firing",
             color="white",
