@@ -127,9 +127,77 @@ def render_solve_video(
     return out
 
 
+def render_solve_video_3d(
+    result: SolveResult,
+    spec: SudokuSpec,
+    coords: np.ndarray,
+    out_path: str | Path,
+    *,
+    fps: int = 2,
+    title: str = "FlyWire brain solving Sudoku",
+) -> Path:
+    """Tier-2 render: 3D neurons in real soma coordinates lighting up as they fire.
+
+    Left — a 3D scatter of the recurrent neurons at their FlyWire soma positions; each
+    neuron's brightness/size tracks its firing rate at the current solve step. Right —
+    the Sudoku board filling in. ``coords`` is ``(N, 3)`` aligned to the population; NaN
+    rows are dropped from the scatter.
+    """
+    if not result.activity:
+        raise ValueError("result has no activity; solve with capture_activity=True")
+
+    finite = np.isfinite(coords).all(axis=1)
+    xyz = coords[finite]
+    # Per-step firing rate per neuron (mean spikes over the T timesteps).
+    rates = [a.mean(axis=0)[finite] for a in result.activity]  # each (n_finite,)
+    vmax = max((r.max() for r in rates if r.size), default=1.0) or 1.0
+    n_steps = len(result.placements)
+
+    fig = plt.figure(figsize=(12, 6))
+    ax3d = fig.add_subplot(1, 2, 1, projection="3d")
+    ax_board = fig.add_subplot(1, 2, 2)
+    fig.suptitle(title, fontsize=14, fontweight="bold")
+
+    def draw(frame: int):
+        ax3d.clear()
+        ax3d.set_axis_off()
+        rate = rates[frame - 1] if frame > 0 else np.zeros(xyz.shape[0])
+        ax3d.scatter(
+            xyz[:, 0],
+            xyz[:, 1],
+            xyz[:, 2],
+            c=rate,
+            cmap="magma",
+            vmin=0,
+            vmax=vmax,
+            s=6 + 40 * (rate / vmax),
+            alpha=0.85,
+            linewidths=0,
+        )
+        ax3d.view_init(elev=20, azim=(-70 + frame * 4))  # slow rotate
+        ax3d.set_title(f"recurrent population ({xyz.shape[0]} neurons)")
+
+        board = result.trajectory[frame]
+        highlight = result.placements[frame - 1][:2] if frame > 0 else None
+        _draw_board(ax_board, spec, board, highlight)
+        if frame > 0:
+            p = result.placements[frame - 1]
+            ax_board.set_title(f"step {frame}: place ({p[0]},{p[1]}) = {p[2]}")
+        else:
+            ax_board.set_title("initial puzzle")
+
+    anim = FuncAnimation(fig, draw, frames=n_steps + 1, interval=1000 / fps)
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    anim.save(str(out), writer=FFMpegWriter(fps=fps, bitrate=2800))
+    plt.close(fig)
+    return out
+
+
 def make_solve_video(
     out_path: str | Path = "results/flywire_solve.mp4",
     *,
+    tier: int = 1,
     side: int = 4,
     n_neurons: int = 1000,
     epochs: int = 40,
@@ -137,7 +205,11 @@ def make_solve_video(
     seed: int = 0,
     device: str = "cpu",
 ) -> Path:
-    """Train a FlyWire SNN, solve one puzzle capturing activity, and render the video."""
+    """Train a FlyWire SNN, solve one puzzle capturing activity, and render the video.
+
+    ``tier=1`` renders board + spike raster (no extra data). ``tier=2`` renders a 3D
+    fly-brain in real soma coordinates (fetches the annotations file).
+    """
     import numpy as np
 
     from evaluation.solver_loop import solve_with_model
@@ -171,8 +243,20 @@ def make_solve_video(
         solution=puz.solution,
         capture_activity=True,
     )
-    path = render_solve_video(result, spec, out_path)
-    print(f"solved={result.solved} steps={result.steps} -> {path}")
+
+    if tier == 2:
+        from connectome.coordinates import neuron_coordinates
+        from connectome.pipeline import subgraph
+
+        # Reproduce the exact node order the model was built with (same cfg.seed).
+        sub, _ = subgraph(
+            n_neurons, method=cfg.sample_method, weight=cfg.conn_weight, seed=cfg.seed
+        )
+        coords = neuron_coordinates(sub.node_ids)
+        path = render_solve_video_3d(result, spec, coords, out_path)
+    else:
+        path = render_solve_video(result, spec, out_path)
+    print(f"tier={tier} solved={result.solved} steps={result.steps} -> {path}")
     return path
 
 
@@ -181,6 +265,7 @@ if __name__ == "__main__":  # pragma: no cover - CLI entry point
 
     parser = argparse.ArgumentParser(description="Render a FlyWire SNN solving Sudoku.")
     parser.add_argument("--out", default="results/flywire_solve.mp4")
+    parser.add_argument("--tier", type=int, default=1, choices=(1, 2))
     parser.add_argument("--side", type=int, default=4)
     parser.add_argument("--n-neurons", type=int, default=1000)
     parser.add_argument("--epochs", type=int, default=40)
@@ -188,6 +273,7 @@ if __name__ == "__main__":  # pragma: no cover - CLI entry point
     args = parser.parse_args()
     make_solve_video(
         args.out,
+        tier=args.tier,
         side=args.side,
         n_neurons=args.n_neurons,
         epochs=args.epochs,

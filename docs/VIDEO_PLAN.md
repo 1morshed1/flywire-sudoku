@@ -1,9 +1,12 @@
 # Video Simulation Plan — Fly Brain Solving Sudoku
 
-**Status:** Tier 1 DONE. `evaluation/visualization.py` renders an mp4 of the FlyWire
-SNN solving 4×4 (board fills in ‖ spike raster). Build it with:
-`uv run --no-sync python -m evaluation.visualization --out results/flywire_solve.mp4`
-Output is gitignored (regenerable). Tier 2 (3D real soma coords) still open — see below.
+**Status:** Tier 1 AND Tier 2 DONE. `evaluation/visualization.py` renders the FlyWire
+SNN solving 4×4 as mp4.
+- Tier 1 (board ‖ spike raster): `python -m evaluation.visualization --out results/flywire_solve.mp4`
+- Tier 2 (3D fly-brain in real soma coords ‖ board): `python -m evaluation.visualization --tier 2 --out results/flywire_solve_3d.mp4`
+Soma coordinates come from the FlyWire annotations TSV (soma_x/y/z, `connectome/
+coordinates.py`), fetched by `connectome.download.ensure_coordinates` (~31 MB). All
+1000 subgraph neurons have coordinates. Outputs gitignored (regenerable).
 
 **Goal:** a video showing the FlyWire-constrained SNN solving a Sudoku puzzle —
 the board filling in step by step, synchronized with the connectome's neurons firing.

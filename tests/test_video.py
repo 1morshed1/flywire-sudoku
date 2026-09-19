@@ -59,3 +59,20 @@ def test_render_writes_mp4(tmp_path):
     out = render_solve_video(res, spec, tmp_path / "solve.mp4", fps=2, max_neurons=40)
     assert out.exists()
     assert out.stat().st_size > 0
+
+
+def test_render_3d_writes_mp4(tmp_path):
+    from evaluation.visualization import render_solve_video_3d
+
+    spec = SudokuSpec.from_side(4)
+    n = 80
+    model = FlyWireSNN(spec, _toy_connectome(n), T=6)
+    rng = np.random.default_rng(3)
+    puz = make_puzzle(spec, rng, "easy")
+    res = solve_with_model(model, spec, puz.puzzle, capture_activity=True)
+    if not res.activity:
+        return
+    coords = rng.random((n, 3)) * 1000  # synthetic soma coords
+    out = render_solve_video_3d(res, spec, coords, tmp_path / "solve3d.mp4", fps=2)
+    assert out.exists()
+    assert out.stat().st_size > 0

@@ -72,12 +72,14 @@
   numerically highest but it's a whisper, not a signal. Legit negative result. Could
   push 9×9 / larger N / harder difficulty, but pattern suggests same null.
 
-- **Video (Tier 1) DONE**: `models/flywire_snn.py` forward gained `return_activity`
-  (returns spikes (T,B,N)); `solve_with_model(..., capture_activity=True)` logs per-step
-  (T,N) spikes; `evaluation/visualization.py` (render_solve_video + make_solve_video CLI)
-  renders an mp4 — left board fills in, right spike raster of top neurons. Verified:
-  results/flywire_solve.mp4 (94KB, 4s, valid H.264, 4×4 solved). 3 video tests pass.
-  imageio-ffmpeg dep added (bundled ffmpeg). Tier 2 (3D real soma coords) still open.
+- **Video Tier 1 + Tier 2 DONE**: `models/flywire_snn.py` forward gained
+  `return_activity` (spikes (T,B,N)); `solve_with_model(capture_activity=True)` logs
+  per-step (T,N) spikes; `evaluation/visualization.py` has render_solve_video (Tier 1:
+  board ‖ spike raster) and render_solve_video_3d (Tier 2: 3D neurons in real soma
+  coords lighting up ‖ board) + make_solve_video CLI (--tier). Soma coords:
+  `connectome/coordinates.py` + `download.ensure_coordinates` (annotations TSV ~31MB,
+  soma_x/y/z; all 1000 subgraph neurons covered). imageio-ffmpeg dep. 4 video tests
+  pass. Verified: results/flywire_solve.mp4 (Tier1) + flywire_solve_3d.mp4 (Tier2).
 
 ## What's left
 

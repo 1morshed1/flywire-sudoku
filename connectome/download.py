@@ -51,6 +51,37 @@ FILES: dict[str, DataFile] = {
 
 DEFAULT_DEST = Path("data/flywire")
 
+# Per-neuron 3D coordinates (soma + a representative position) live in the FlyWire
+# annotations repo, not the GCS mirror. Used for the Tier-2 3D video (VIDEO_PLAN.md).
+# root_id in this file is the 783 materialization, matching `fafb_783_id`.
+COORDS_URL = (
+    "https://raw.githubusercontent.com/flyconnectome/flywire_annotations/"
+    "main/supplemental_files/Supplemental_file1_neuron_annotations.tsv"
+)
+COORDS_FILENAME = "fafb_783_neuron_annotations.tsv"
+
+
+def ensure_coordinates(dest_dir: Path | str = DEFAULT_DEST, *, force: bool = False) -> Path:
+    """Download the neuron-annotations TSV (soma/pos xyz per neuron); return its path.
+
+    ~31 MB. Skipped if a non-empty file already exists (no size manifest since it can
+    change upstream). Provides ``root_id``, ``soma_x/y/z`` and ``pos_x/y/z``.
+    """
+    dest = Path(dest_dir)
+    dest.mkdir(parents=True, exist_ok=True)
+    out = dest / COORDS_FILENAME
+    if out.exists() and not force and out.stat().st_size > 0:
+        return out
+    tmp = out.with_suffix(out.suffix + ".part")
+    with urllib.request.urlopen(COORDS_URL) as resp, open(tmp, "wb") as fh:
+        while True:
+            buf = resp.read(1 << 20)
+            if not buf:
+                break
+            fh.write(buf)
+    tmp.replace(out)
+    return out
+
 
 def _download_one(df: DataFile, dest_dir: Path, *, force: bool = False) -> Path:
     """Fetch a single file (streaming), skipping when already present and complete."""
