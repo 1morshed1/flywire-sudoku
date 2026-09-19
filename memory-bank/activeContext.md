@@ -2,17 +2,42 @@
 
 ## Current focus
 
-Phases 0-7 done + video Tier 1 done. Remaining optional: video Tier 2 (3D real soma
-coords), deeper Path-A regimes (9×9 / larger N), RL polish. Await user steer.
+ALL 8 phases done + video (both tiers, 4×4 & 9×9) done and user-approved. Project is a
+complete tested whole. AWAITING USER PICK on what's next (menu below) — do not start
+until they choose.
 
-## Video (Tier 1 + Tier 2) — done
+## What's next (menu presented to user; recommend 1 then 3)
+
+1. **Fix 9×9 generalization (recommended).** 9×9 flywire OVERFITS (solves training-seed
+   puzzles, ~0% unseen). Fix: n_train 6k→40k + weight_decay/dropout + maybe larger N.
+   Makes the 9×9 solve/video real, not in-distribution-only. ~1 train run.
+2. **Deeper topology ablation** — 9×9 / larger N / harder difficulty; add dense +
+   feedforward conditions. Likely still null but closes the science.
+3. **Research writeup** — no summary doc yet; user wanted this as a research project.
+   Report: capability (connectome SNN learns + solves Sudoku) + honest null (topology ≈
+   controls) + methods + limitations.
+4. **Efficiency metrics** (PLAN §22, unreported): spikes/inference, latency, energy proxy.
+5. **Break 20k VRAM ceiling** — custom sparse-gradient autograd (kills O(N²) backward).
+6. **RL fine-tuning** (Phase 8, deferred).
+
+## Video (Tier 1 + Tier 2) — DONE, approved
 
 `evaluation/visualization.py`: render_solve_video (Tier1 board‖raster) +
-render_solve_video_3d (Tier2 3D fly-brain) + make_solve_video CLI (--tier 1|2).
-Soma coords via `connectome/coordinates.py` + `download.ensure_coordinates`
-(annotations TSV, soma_x/y/z, cols root_id/pos_*/soma_*). Build:
-`uv run --no-sync python -m evaluation.visualization --tier 2 --out results/x.mp4`.
-Outputs gitignored. All optional video work complete.
+render_solve_video_3d (Tier2 viral-style 3D fly-brain) + make_solve_video CLI
+(--tier 1|2, --state, --side, --device). Tier2 look: full ~139k soma mist backdrop
+(`connectome/coordinates.py::all_coordinates`, z-scaled ×10 for anisotropy), neurons
+region-colored, firing glow + white core, active synapse edges, per-region rate panel,
+FIXED frontal view (elev80/azim-90, zoom 1.1, no rotation), require solved + 3s hold.
+Build: `uv run --no-sync python -m evaluation.visualization --tier 2 --side 9 --state
+results/flywire9_state.pt --device cuda --out results/flywire_fx_9x9.mp4`. Verified 9×9
+start→end full solve, full brain in view. Outputs gitignored.
+
+## 9×9 caveat (IMPORTANT, honest)
+
+9×9 flywire (1k neurons, 6k train, 60ep) OVERFITS. Earlier "solves 65%" was DATA
+LEAKAGE (evaluate_solver default seed == train seed). Real: ~70% on training-seed
+puzzles, ~0% unseen. The 9×9 video draws its puzzle from the training seed stream to
+guarantee a solve to show. 4×4 generalizes fully (loop completion ~1.0 on unseen).
 
 ## Paths A + B outcomes (done)
 
@@ -40,24 +65,13 @@ Outputs gitignored. All optional video work complete.
 - sensory seeds = super_class in {sensory, sensory_ascending} OR flow=='afferent'.
 - transmitters: acetylcholine +1; gaba/glutamate −1; amines +1; unknown +1.
 
-## Next steps — Path A (topology separation hunt)
+## Reusable how-to (if resuming option 1 — 9×9 generalization)
 
-1. Re-run `experiments/topology_ablation.py` in capacity-pressured regimes (pick one
-   or more): (a) side=9 with more epochs/data; (b) n_neurons=200; (c) difficulty
-   hard/expert on 4×4 or 9×9. Add `dense`/`feedforward` conditions for full §18 set.
-2. Multiple seeds (≥3), report mean±spread; compare flywire vs shuffled (key null).
-3. If still null across regimes → honest finding: topology doesn't help this task.
-   If separation appears → the headline result.
-
-## Next steps — Path B (Phase 7 autonomous solver)
-
-1. `sudoku`/`evaluation`: constraint-propagation solve loop. Given a puzzle + trained
-   model: encode board → model logits (B=1) → mask illegal (encoder.legal_action_mask)
-   → pick globally most-confident (cell,digit) → place via env → repeat until solved or
-   stuck. Reuse SudokuEnv(task='place').
-2. `evaluation/`: puzzle-completion rate, steps-to-solve, invalid-move rate, per-model
-   comparison (MLP/dense/flywire). PLAN.md §22.
-3. Optional Phase 8 polish + RL fine-tuning (deferred; constraint-loop is the spine).
+- Train: `TrainConfig(model='flywire_snn', side=9, n_neurons=1000, n_train=40000,
+  epochs=?, weight_decay=1e-4, ...)`; watch VAL (seed+1) move_acc, not train seed.
+- Verify generalization: `evaluate_solver(model, spec, seed=1234)` (NOT seed 0 — that
+  overlaps train data). Completion on an unseen seed is the real number.
+- Save with `--state`; video reuses it. 9×9 gen is slow (~60ms/puzzle) → 40k ≈ 40min gen.
 
 ## Notes
 
@@ -84,9 +98,7 @@ over single-cell Task A. Cleaner, gives move_acc + solve_rate directly, matches 
 
 ## Open / pending
 
-- **Video simulation** of fly brain solving Sudoku — user wants this. Plan written in
-  `docs/VIDEO_PLAN.md`. Needs Phase 7 solver first + a `return_activity` flag on
-  FlyWireSNN.forward + `evaluation/visualization.py` renderer → mp4 (imageio-ffmpeg).
-  Tier 1 = board + spike raster; Tier 2 = 3D real soma coords. Deferred, pick up later.
-- CAVE account only if live queries needed later
-- RL fine-tuning optional after autonomous loop works
+- 9×9 generalization (overfit) — option 1 above; the main real gap.
+- Research writeup doc — option 3; user framed this as a research project.
+- Efficiency metrics, 20k VRAM ceiling autograd, RL fine-tuning — options 4-6.
+- CAVE account only if live queries needed later.

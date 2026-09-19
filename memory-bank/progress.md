@@ -119,10 +119,11 @@
 
 ## Current status
 
-Phases 0-6 complete. Model ladder + topology-ablation machinery done. Next: Phase 7 —
-autonomous constraint-propagation solve loop (score empty cells, place most-confident
-legal digit, repeat). Uses sudoku env + a trained model; add evaluation/ metrics
-(puzzle completion, steps-to-solve, invalid-rate) per PLAN.md §22.
+All 8 phases + video (both tiers, 4×4 & 9×9, user-approved) done. Complete, tested
+(65 tests), documented, all on origin/main. Awaiting user pick on what's next:
+(1) fix 9×9 generalization [recommended], (2) deeper topology ablation, (3) research
+writeup, (4) efficiency metrics, (5) 20k-ceiling sparse autograd, (6) RL. Details in
+activeContext "What's next".
 
 ## Known issues / risks
 
