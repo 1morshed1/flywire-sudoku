@@ -63,6 +63,10 @@ class FlyWireSNN(nn.Module):
         (Regime B). When None, weights are unconstrained in sign.
     recurrent_scale:
         Scale for the initial edge-weight magnitudes.
+    dropout:
+        Dropout probability applied to the recurrent spikes feeding the output
+        projection each timestep. Regularizes the large dense output layer to curb
+        9x9 overfitting; 0.0 disables it (default).
     lif_params:
         Optional Norse :class:`LIFParameters`.
     """
@@ -77,6 +81,7 @@ class FlyWireSNN(nn.Module):
         train_recurrent: bool = True,
         signs: np.ndarray | None = None,
         recurrent_scale: float = 1.0,
+        dropout: float = 0.0,
         lif_params: LIFParameters | None = None,
     ) -> None:
         super().__init__()
@@ -115,6 +120,7 @@ class FlyWireSNN(nn.Module):
         # --- dense trainable projections + spiking cells ---
         self.input_linear = nn.Linear(self.in_features, self.N)
         self.lif = LIFCell(p)
+        self.dropout = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
         self.output_linear = nn.Linear(self.N, self.out_features)
         self.readout = LICell()
 
@@ -159,7 +165,7 @@ class FlyWireSNN(nn.Module):
             spikes, lif_state = self.lif(inp_cur + rec_cur, lif_state)
             if return_activity:
                 activity.append(spikes.detach())
-            out = self.output_linear(spikes)
+            out = self.output_linear(self.dropout(spikes))
             v, read_state = self.readout(out, read_state)
             voltage_sum = voltage_sum + v
 

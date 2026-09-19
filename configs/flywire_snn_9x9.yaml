@@ -1,0 +1,43 @@
+# FlyWire-constrained SNN, 9x9 generalization run (fixes the overfit gap).
+# Run: uv run --no-sync python -m training.supervised --config configs/flywire_snn_9x9.yaml
+#
+# Context: the earlier 9x9 flywire run (6k train, no regularization) OVERFIT — it
+# solved training-seed puzzles but ~0% of unseen ones. This config attacks that with
+# (a) far more data (40k), (b) weight_decay on the big dense I/O layers, and
+# (c) dropout on the recurrent spikes. Watch move_acc on the val loader (unseen
+# seed+1) and the UNSEEN(seed=1234) solver completion — those are the honest numbers.
+
+model: flywire_snn
+side: 9
+
+# Connectome mask
+n_neurons: 1000
+sample_method: top_degree
+conn_weight: count
+
+# Trainable regime
+train_recurrent: true
+use_signs: false
+recurrent_scale: 1.0
+
+# Spiking sim
+T: 10
+encoding: constant
+
+# Data / optim — the generalization fix
+n_train: 40000
+n_val: 2000
+difficulty: easy
+epochs: 40
+batch_size: 128
+lr: 0.001
+weight_decay: 0.0001        # L2 on dense input/output projections
+snn_dropout: 0.3            # dropout on recurrent spikes -> output layer
+amp: false                  # sparse recurrent matmul: keep AMP off
+seed: 0
+device: auto
+log_every: 2
+
+# Reproducible honest evaluation + artifact for the video
+eval_solver_seed: 1234      # disjoint from train(0)/val(1): the real generalization number
+save_state: results/flywire9_state.pt

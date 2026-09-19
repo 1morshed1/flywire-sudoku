@@ -100,6 +100,7 @@ class TrainConfig:
     train_recurrent: bool = True  # False = Regime C (frozen connectome)
     use_signs: bool = False  # True = Regime B (Dale's-law signs)
     recurrent_scale: float = 1.0
+    snn_dropout: float = 0.0  # dropout on recurrent spikes (FlyWireSNN regularization)
     n_train: int = 5000
     n_val: int = 500
     difficulty: str = "easy"
@@ -111,6 +112,8 @@ class TrainConfig:
     seed: int = 0
     device: str = "auto"
     log_every: int = 1
+    save_state: str = ""  # path to torch.save the trained model state_dict (for video/eval)
+    eval_solver_seed: int = -1  # if >=0, run an honest unseen-seed solver eval after training
     extra: dict = field(default_factory=dict)
 
 
@@ -143,6 +146,7 @@ def build_model(spec: SudokuSpec, cfg: TrainConfig) -> nn.Module:
             train_recurrent=cfg.train_recurrent,
             signs=signs if cfg.use_signs else None,
             recurrent_scale=cfg.recurrent_scale,
+            dropout=cfg.snn_dropout,
         )
     raise ValueError(f"unknown model {cfg.model!r}")
 
@@ -205,6 +209,43 @@ def train_supervised(
             )
 
     metrics["params"] = float(model.num_parameters())
+
+    # Honest generalization check: run the autonomous solver on puzzles drawn from a
+    # seed the model never trained or validated on (train=seed, val=seed+1). This is
+    # the number that exposes 9x9 overfitting — evaluating on seed 0 leaks train data.
+    if cfg.eval_solver_seed >= 0:
+        from evaluation.metrics import evaluate_solver
+
+        if cfg.eval_solver_seed in (cfg.seed, cfg.seed + 1):
+            raise ValueError(
+                f"eval_solver_seed {cfg.eval_solver_seed} overlaps train/val seeds "
+                f"({cfg.seed}, {cfg.seed + 1}); pick a disjoint seed for an honest eval."
+            )
+        solver_metrics = evaluate_solver(
+            model,
+            spec,
+            n_puzzles=100,
+            difficulty=cfg.difficulty,
+            device=device,
+            seed=cfg.eval_solver_seed,
+        )
+        metrics["completion_rate_unseen"] = solver_metrics["completion_rate"]
+        metrics["placement_accuracy_unseen"] = solver_metrics["placement_accuracy"]
+        if verbose:
+            print(
+                f"[{cfg.model}] UNSEEN(seed={cfg.eval_solver_seed}) "
+                f"completion {solver_metrics['completion_rate']:.3f}  "
+                f"placement_acc {solver_metrics['placement_accuracy']:.3f}"
+            )
+
+    if cfg.save_state:
+        from pathlib import Path
+
+        Path(cfg.save_state).parent.mkdir(parents=True, exist_ok=True)
+        torch.save(model.state_dict(), cfg.save_state)
+        if verbose:
+            print(f"[{cfg.model}] saved state -> {cfg.save_state}")
+
     if return_model:
         return metrics, model
     return metrics

@@ -19,12 +19,18 @@ Tensors produced per example
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import torch
 from torch.utils.data import Dataset
 
 from sudoku import SudokuSpec, make_puzzle, one_hot
+
+# On-disk cache for generated datasets. 9x9 generation is ~44 ms/puzzle, so a 40k
+# training set costs ~30 min; caching makes every re-run (retrain, video, eval)
+# instant. Keyed by the full generation signature so a mismatch never loads stale data.
+CACHE_DIR = Path("data/datasets")
 
 
 @dataclass
@@ -36,18 +42,31 @@ class SudokuTensors:
     empty: torch.Tensor  # (N, num_cells) bool
 
 
+def _cache_path(spec: SudokuSpec, n: int, difficulty: str, seed: int) -> Path:
+    """Deterministic cache filename for a generation signature."""
+    return CACHE_DIR / f"{spec.side}_{difficulty}_{n}_{seed}.pt"
+
+
 def build_dataset(
     spec: SudokuSpec,
     n: int,
     *,
     difficulty: str = "easy",
     seed: int = 0,
+    cache: bool = True,
 ) -> SudokuTensors:
     """Generate ``n`` puzzles and stack them into tensors.
 
     Generation is deterministic given ``seed``. For 9x9 this is the slow step
-    (tens of ms per puzzle), so callers typically build once and reuse / cache.
+    (~44 ms per puzzle), so results are cached to ``data/datasets/`` keyed by the
+    generation signature ``(side, difficulty, n, seed)``. A later call with the same
+    signature loads the cache instead of regenerating. Set ``cache=False`` to bypass.
     """
+    path = _cache_path(spec, n, difficulty, seed)
+    if cache and path.exists():
+        blob = torch.load(path, weights_only=True)
+        return SudokuTensors(x=blob["x"], target=blob["target"], empty=blob["empty"])
+
     rng = np.random.default_rng(seed)
     xs = np.empty((n, spec.num_cells * (spec.side + 1)), dtype=np.float32)
     targets = np.empty((n, spec.num_cells), dtype=np.int64)
@@ -60,11 +79,15 @@ def build_dataset(
         targets[i] = puz.solution.reshape(-1) - 1
         empties[i] = puz.puzzle.reshape(-1) == 0
 
-    return SudokuTensors(
+    tensors = SudokuTensors(
         x=torch.from_numpy(xs),
         target=torch.from_numpy(targets),
         empty=torch.from_numpy(empties),
     )
+    if cache:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        torch.save({"x": tensors.x, "target": tensors.target, "empty": tensors.empty}, path)
+    return tensors
 
 
 class SudokuMoveDataset(Dataset):
