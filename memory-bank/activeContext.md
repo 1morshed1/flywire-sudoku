@@ -81,6 +81,9 @@ over single-cell Task A. Cleaner, gives move_acc + solve_rate directly, matches 
 
 ## Open / pending
 
-- Exact Norse/torch pin versions (verify at install)
+- **Video simulation** of fly brain solving Sudoku — user wants this. Plan written in
+  `docs/VIDEO_PLAN.md`. Needs Phase 7 solver first + a `return_activity` flag on
+  FlyWireSNN.forward + `evaluation/visualization.py` renderer → mp4 (imageio-ffmpeg).
+  Tier 1 = board + spike raster; Tier 2 = 3D real soma coords. Deferred, pick up later.
 - CAVE account only if live queries needed later
 - RL fine-tuning optional after autonomous loop works
