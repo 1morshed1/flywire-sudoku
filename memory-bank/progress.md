@@ -80,6 +80,10 @@
   `connectome/coordinates.py` + `download.ensure_coordinates` (annotations TSV ~31MB,
   soma_x/y/z; all 1000 subgraph neurons covered). imageio-ffmpeg dep. 4 video tests
   pass. Verified: results/flywire_solve.mp4 (Tier1) + flywire_solve_3d.mp4 (Tier2).
+  Tier2 render fixed after user feedback ("don't see neurons firing, make it slower/
+  longer"): was averaging spikes over T (flat dark cloud, 4s). Now animates PER
+  TIMESTEP — dim grey brain + bright cyan spiking-neuron overlay that blinks; frames =
+  steps×T×frames_per_timestep + hold. Result: 25s, visible firing (~150 frames @ 6fps).
 
 ## What's left
 

@@ -133,60 +133,74 @@ def render_solve_video_3d(
     coords: np.ndarray,
     out_path: str | Path,
     *,
-    fps: int = 2,
+    fps: int = 6,
+    frames_per_timestep: int = 2,
+    fire_color: str = "#00e5ff",
     title: str = "FlyWire brain solving Sudoku",
 ) -> Path:
-    """Tier-2 render: 3D neurons in real soma coordinates lighting up as they fire.
+    """Tier-2 render: 3D neurons in real soma coordinates blinking as they spike.
 
-    Left — a 3D scatter of the recurrent neurons at their FlyWire soma positions; each
-    neuron's brightness/size tracks its firing rate at the current solve step. Right —
-    the Sudoku board filling in. ``coords`` is ``(N, 3)`` aligned to the population; NaN
-    rows are dropped from the scatter.
+    One video frame per *simulation timestep* (not per solve step), so the recurrent
+    population visibly fires: a dim grey point cloud shows the whole brain, and neurons
+    that spike at the current timestep light up bright and large. The board (right)
+    reveals each placement on the final timestep of that solve step.
+
+    ``coords`` is ``(N, 3)`` aligned to the population; NaN rows are dropped.
+    ``frames_per_timestep`` repeats each timestep to slow the video down; raise it (or
+    lower ``fps``) for a slower, longer clip.
     """
     if not result.activity:
         raise ValueError("result has no activity; solve with capture_activity=True")
 
     finite = np.isfinite(coords).all(axis=1)
     xyz = coords[finite]
-    # Per-step firing rate per neuron (mean spikes over the T timesteps).
-    rates = [a.mean(axis=0)[finite] for a in result.activity]  # each (n_finite,)
-    vmax = max((r.max() for r in rates if r.size), default=1.0) or 1.0
+    acts = [a[:, finite] for a in result.activity]  # each (T, n_finite) binary spikes
+    n_t = acts[0].shape[0]
     n_steps = len(result.placements)
+
+    # One entry per (solve step, timestep), each repeated frames_per_timestep times,
+    # plus a hold on the final solved board.
+    plan = [(s, t) for s in range(n_steps) for t in range(n_t) for _ in range(frames_per_timestep)]
+    plan += [(n_steps - 1, n_t - 1)] * (fps * 2)  # ~2 s hold at the end
 
     fig = plt.figure(figsize=(12, 6))
     ax3d = fig.add_subplot(1, 2, 1, projection="3d")
     ax_board = fig.add_subplot(1, 2, 2)
     fig.suptitle(title, fontsize=14, fontweight="bold")
+    fig.patch.set_facecolor("white")
 
-    def draw(frame: int):
+    def draw(idx: int):
+        s, t = plan[idx]
+        fire = acts[s][t] > 0
+
         ax3d.clear()
         ax3d.set_axis_off()
-        rate = rates[frame - 1] if frame > 0 else np.zeros(xyz.shape[0])
-        ax3d.scatter(
-            xyz[:, 0],
-            xyz[:, 1],
-            xyz[:, 2],
-            c=rate,
-            cmap="magma",
-            vmin=0,
-            vmax=vmax,
-            s=6 + 40 * (rate / vmax),
-            alpha=0.85,
-            linewidths=0,
-        )
-        ax3d.view_init(elev=20, azim=(-70 + frame * 4))  # slow rotate
-        ax3d.set_title(f"recurrent population ({xyz.shape[0]} neurons)")
+        # Dim grey cloud = the whole recurrent population (the brain shape).
+        ax3d.scatter(xyz[:, 0], xyz[:, 1], xyz[:, 2], c="#c9c9c9", s=3, alpha=0.18, linewidths=0)
+        # Bright overlay = neurons spiking right now.
+        if fire.any():
+            ax3d.scatter(
+                xyz[fire, 0],
+                xyz[fire, 1],
+                xyz[fire, 2],
+                c=fire_color,
+                s=30,
+                alpha=0.95,
+                linewidths=0,
+            )
+        azim = -70 + 150 * (idx / max(len(plan) - 1, 1))  # slow rotate over the clip
+        ax3d.view_init(elev=18, azim=azim)
+        ax3d.set_title(f"step {s + 1}/{n_steps} · t={t + 1}/{n_t} · {int(fire.sum())} firing")
 
-        board = result.trajectory[frame]
-        highlight = result.placements[frame - 1][:2] if frame > 0 else None
+        # Board: pre-placement board while computing; reveal the placement on last t.
+        last_t = t == n_t - 1
+        board = result.trajectory[s + 1] if last_t else result.trajectory[s]
+        highlight = result.placements[s][:2] if last_t else None
         _draw_board(ax_board, spec, board, highlight)
-        if frame > 0:
-            p = result.placements[frame - 1]
-            ax_board.set_title(f"step {frame}: place ({p[0]},{p[1]}) = {p[2]}")
-        else:
-            ax_board.set_title("initial puzzle")
+        p = result.placements[s]
+        ax_board.set_title(f"placed ({p[0]},{p[1]}) = {p[2]}" if last_t else "computing…")
 
-    anim = FuncAnimation(fig, draw, frames=n_steps + 1, interval=1000 / fps)
+    anim = FuncAnimation(fig, draw, frames=len(plan), interval=1000 / fps)
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     anim.save(str(out), writer=FFMpegWriter(fps=fps, bitrate=2800))
