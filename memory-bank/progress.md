@@ -90,9 +90,19 @@
   neurons light up (real wiring); per-region firing-rate panel; dark board. Per-axis
   tight bounds + proportional box_aspect(zoom=1.6) + repositioned 3D panel so the flat
   fly-brain fills the frame. make_solve_video: --state (load/save model, skip retrain),
-  max_attempts (pick a solved puzzle), auto frames_per_timestep. 9×9 SUPPORTED: flywire
-  9×9 solves 65% via loop (placement_acc 0.987), so 9×9 video renders a solved puzzle.
-  4 video tests pass; 4×4 FX frame verified good.
+  max_attempts (pick a solved puzzle), auto frames_per_timestep. 4 video tests pass.
+  CORRECTION: 9×9 flywire (1k neurons, 6k train puzzles, 60 ep) OVERFITS — the earlier
+  "solves 65%" was DATA LEAKAGE (evaluate_solver default seed=0 == the training data
+  seed). Real generalization: ~70% on training-distribution seed 0, but ~0% on unseen
+  seeds (1, 100, ...). So the 9×9 video draws its puzzle from the training seed stream
+  (in-distribution) to guarantee a full solve to show; the 4×4 model generalizes and
+  solves unseen puzzles regardless. To make 9×9 generalize needs far more train data /
+  regularization / bigger N (future work).
+- **Video Tier 2 — real fly-brain mist**: full ~139k soma cloud (`all_coordinates()`)
+  as dim backdrop → recognizable fly-brain shape + 3D depth; z-scaled ×10 to undo
+  FlyWire voxel anisotropy (was why it looked flat); frontal view (elev≈80, azim≈-90 =
+  xy face) + parallax swing; smaller firing glow; require fully-solved puzzle (raises
+  otherwise) + 3s end hold. 4×4 mist frame verified: fly-brain shape reads clearly.
 
 ## What's left
 

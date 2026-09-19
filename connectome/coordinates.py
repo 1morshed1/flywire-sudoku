@@ -24,6 +24,26 @@ def load_coordinates(path: Path | str) -> pl.DataFrame:
     )
 
 
+def all_coordinates(
+    *, dest: Path | str = DEFAULT_DEST, download: bool = True
+) -> np.ndarray:
+    """Return an ``(M, 3)`` array of every neuron's coordinate (soma, else position).
+
+    This is the whole ~139k-soma point cloud used as the dim anatomical backdrop in the
+    Tier-2 video (so the recognizable fly-brain shape and 3D depth read clearly).
+    """
+    path = ensure_coordinates(dest) if download else Path(dest) / COORDS_FILENAME
+    df = load_coordinates(path).with_columns(
+        [
+            pl.coalesce(["soma_x", "pos_x"]).alias("x"),
+            pl.coalesce(["soma_y", "pos_y"]).alias("y"),
+            pl.coalesce(["soma_z", "pos_z"]).alias("z"),
+        ]
+    )
+    xyz = df.select(["x", "y", "z"]).to_numpy().astype(np.float64)
+    return xyz[np.isfinite(xyz).all(axis=1)]
+
+
 def neuron_coordinates(
     node_ids: list[str], *, dest: Path | str = DEFAULT_DEST, download: bool = True
 ) -> np.ndarray:

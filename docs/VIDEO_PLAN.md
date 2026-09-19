@@ -14,8 +14,12 @@ glow + white hot core; active synapse edges from just-fired neurons light up (si
 propagating through the real wiring); a per-region firing-rate panel; per-axis tight
 bounds + proportional box aspect so the flat fly-brain fills the frame.
 
-**9×9:** supported. The FlyWire SNN solves ~65% of 9×9 easy puzzles via the loop
-(placement accuracy 0.987); `make_solve_video(max_attempts=...)` picks a solved puzzle.
+**9×9:** supported, with a caveat. The 9×9 FlyWire model (1k neurons) **overfits** —
+it solves ~70% of *training-distribution* puzzles but ~0% of unseen ones (an earlier
+"65% via loop" figure was data leakage: the eval seed matched the train seed). So the
+9×9 video draws its puzzle from the training seed stream to guarantee a full solve to
+render; the 4×4 model generalizes and solves unseen puzzles. Better 9×9 generalization
+needs far more training data / regularization / larger N (future work).
 Reuse a trained model with `--state <path>` to skip retraining. Example:
 `python -m evaluation.visualization --tier 2 --side 9 --state results/flywire9_state.pt --device cuda --out results/flywire_fx_9x9.mp4`
 → ~50 s clip (29 solve steps), results/flywire_fx_9x9.mp4.

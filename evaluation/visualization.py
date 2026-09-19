@@ -180,11 +180,12 @@ def render_solve_video_3d(
     coords: np.ndarray,
     out_path: str | Path,
     *,
+    bg_coords: np.ndarray | None = None,
     adjacency=None,
     regions: list[str] | None = None,
     fps: int = 6,
     frames_per_timestep: int = 2,
-    max_edges: int = 1200,
+    max_edges: int = 700,
     title: str = "FlyWire brain solving Sudoku",
 ) -> Path:
     """Tier-2 render (full FX): a connectome "playing Sudoku" in the viral-demo style.
@@ -214,9 +215,10 @@ def render_solve_video_3d(
     buckets = _buckets_for(regions, coords.shape[0])[finite]
     bucket_rgba = np.array([_BUCKET_COLORS[_BUCKET_ORDER[b]] for b in buckets])
 
-    # Per-axis tight bounds + proportional box aspect so the (flat, wide) fly brain
-    # fills the panel in its natural shape instead of a tiny cube.
-    lo, hi = xyz.min(0), xyz.max(0)
+    # Bounds/aspect come from the full brain (bg_coords) when present, so the whole
+    # anatomy fits and keeps its true proportions.
+    ref = bg_coords if bg_coords is not None else xyz
+    lo, hi = ref.min(0), ref.max(0)
     ext = np.maximum(hi - lo, 1e-6)
     box_aspect = ext / ext.max()
 
@@ -231,7 +233,7 @@ def render_solve_video_3d(
         seg_post = remap[coo.col[keep]]
 
     plan = [(s, t) for s in range(n_steps) for t in range(n_t) for _ in range(frames_per_timestep)]
-    plan += [(n_steps - 1, n_t - 1)] * (fps * 2)  # end hold
+    plan += [(n_steps - 1, n_t - 1)] * (fps * 3)  # ~3 s hold on the finished board
 
     fig = plt.figure(figsize=(13, 7), facecolor="black")
     gs = fig.add_gridspec(2, 2, width_ratios=[2, 1], height_ratios=[3, 1])
@@ -252,9 +254,22 @@ def render_solve_video_3d(
         ax3d.set_xlim(lo[0], hi[0])
         ax3d.set_ylim(lo[1], hi[1])
         ax3d.set_zlim(lo[2], hi[2])
-        ax3d.set_box_aspect(box_aspect, zoom=1.6)
-        # Dim region-colored cloud = the whole population.
-        ax3d.scatter(xyz[:, 0], xyz[:, 1], xyz[:, 2], c=bucket_rgba, s=4, alpha=0.16, linewidths=0)
+        ax3d.set_box_aspect(box_aspect, zoom=1.5)
+
+        # Dense soma mist = the whole fly brain (the recognizable anatomy + 3D depth).
+        if bg_coords is not None:
+            ax3d.scatter(
+                bg_coords[:, 0],
+                bg_coords[:, 1],
+                bg_coords[:, 2],
+                c="#a9c7e8",
+                s=0.7,
+                alpha=0.28,
+                linewidths=0,
+                depthshade=True,
+            )
+        # Faint markers for the model's neurons (locate the circuit within the brain).
+        ax3d.scatter(xyz[:, 0], xyz[:, 1], xyz[:, 2], c=bucket_rgba, s=2, alpha=0.20, linewidths=0)
 
         # Active synapse edges: outgoing from neurons firing now.
         if seg_pre is not None and fire.any():
@@ -265,19 +280,20 @@ def render_solve_video_3d(
                 ap, aq = ap[sel], aq[sel]
             if ap.size:
                 segs = np.stack([xyz[ap], xyz[aq]], axis=1)
-                lc = Line3DCollection(segs, colors=bucket_rgba[ap], linewidths=0.5, alpha=0.28)
+                lc = Line3DCollection(segs, colors=bucket_rgba[ap], linewidths=0.5, alpha=0.30)
                 ax3d.add_collection3d(lc)
 
-        # Firing neurons with layered glow (bloom) + a white-hot core.
+        # Firing neurons: region-colored glow (bloom) + a white-hot core.
         if fire.any():
             fx = xyz[fire]
             fc = bucket_rgba[fire]
-            for size, alpha in ((190, 0.06), (95, 0.14), (42, 0.35), (18, 0.85)):
+            for size, alpha in ((60, 0.08), (26, 0.20), (11, 0.9)):
                 ax3d.scatter(fx[:, 0], fx[:, 1], fx[:, 2], c=fc, s=size, alpha=alpha, linewidths=0)
-            ax3d.scatter(fx[:, 0], fx[:, 1], fx[:, 2], c="white", s=5, alpha=0.9, linewidths=0)
+            ax3d.scatter(fx[:, 0], fx[:, 1], fx[:, 2], c="white", s=3, alpha=0.9, linewidths=0)
 
-        azim = -70 + 150 * (idx / max(len(plan) - 1, 1))
-        ax3d.view_init(elev=18, azim=azim)
+        # Frontal view (fly-brain face) with a gentle parallax swing for 3D feel.
+        azim = -90 + 14 * np.sin(2 * np.pi * idx / max(len(plan) - 1, 1))
+        ax3d.view_init(elev=80, azim=azim)
         ax3d.set_title(
             f"step {s + 1}/{n_steps} · t={t + 1}/{n_t} · {int(fire.sum())} firing",
             color="white",
@@ -381,7 +397,10 @@ def make_solve_video(
         if state_path:
             torch.save(model.state_dict(), state_path)
 
-    rng = np.random.default_rng(seed + 100)
+    # Draw puzzles from the training seed stream: the 9x9 FlyWire model overfits and
+    # reliably solves only in-distribution puzzles, so this ensures a full solve to
+    # render (the 4x4 model generalizes and solves unseen puzzles regardless).
+    rng = np.random.default_rng(seed)
     result = None
     for _ in range(max_attempts):
         puz = make_puzzle(spec, rng, difficulty)
@@ -395,16 +414,28 @@ def make_solve_video(
         )
         if result.solved:
             break
+    if not result.solved:
+        raise RuntimeError(
+            f"no puzzle solved in {max_attempts} attempts; train longer or raise max_attempts"
+        )
 
     if tier == 2:
-        from connectome.coordinates import neuron_coordinates
+        from connectome.coordinates import all_coordinates, neuron_coordinates
         from connectome.pipeline import full_connectome, subgraph
+
+        z_scale = 10.0  # undo FlyWire voxel anisotropy (z ≈ 40 nm vs x,y ≈ 4 nm)
 
         # Reproduce the exact node order the model was built with (same cfg.seed).
         sub, _ = subgraph(
             n_neurons, method=cfg.sample_method, weight=cfg.conn_weight, seed=cfg.seed
         )
         coords = neuron_coordinates(sub.node_ids)
+        coords[:, 2] *= z_scale
+        # Full-brain soma cloud as the dim anatomical backdrop (subsampled for speed).
+        bg = all_coordinates()
+        bg[:, 2] *= z_scale
+        if len(bg) > 60000:
+            bg = bg[np.random.default_rng(0).choice(len(bg), 60000, replace=False)]
         # Region (super_class) per neuron, aligned to the subgraph node order.
         meta, _ = full_connectome(weight=cfg.conn_weight)
         sc = dict(zip(meta["fafb_783_id"].to_list(), meta["super_class"].to_list()))
@@ -416,6 +447,7 @@ def make_solve_video(
             spec,
             coords,
             out_path,
+            bg_coords=bg,
             adjacency=sub.adj,
             regions=regions,
             frames_per_timestep=fpt,
