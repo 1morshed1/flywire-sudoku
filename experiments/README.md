@@ -68,9 +68,27 @@ Finding topology separation (if it exists) needs a harder or capacity-pressured 
 | shuffled | 0.920 | 0.595 | 0.060 |
 | random | 0.919 | 0.580 | 0.044 |
 
-**Faint ordered hint:** with only 200 neurons, solve_rate follows the reciprocity
-ordering (flywire ≥ shuffled ≥ random). But the flywire−random gap (0.025) is smaller
-than the per-condition seed spread (~0.085), so it is **not significant at 3 seeds**.
-A higher-seed power test is running to confirm or bury it. Interpretation stands: no
-established separation yet, but the direction is suggestive under capacity pressure.
+**Faint ordered hint (3 seeds):** solve_rate followed the reciprocity ordering
+(flywire ≥ shuffled ≥ random), but the gap was inside seed noise.
+
+### Power test (N=200, 4×4 easy, 8 seeds)
+
+| topology | solve_rate (mean ± std) | reciprocity |
+|----------|------------------------:|------------:|
+| flywire | 0.590 ± 0.027 | 0.605 |
+| shuffled | 0.587 ± 0.029 | 0.061 |
+| random | 0.575 ± 0.030 | 0.046 |
+
+flywire − random = **0.015** (se 0.014, z ≈ 1.05) → **not significant**. The 3-seed
+hint shrank with more seeds.
+
+### Verdict: no topology separation at accessible scale
+
+Across 4×4-easy (saturated) and N=200 (capacity-pressured, 8 seeds), the FlyWire mask
+performs equal to a degree-preserving shuffle and to a random graph, within seed noise,
+despite 10–13× differences in reciprocity. **Biological wiring confers no measurable
+advantage on Sudoku here.** FlyWire is consistently numerically highest but it is a
+whisper, not a signal. This is a legitimate negative result. Pushing to 9×9, larger N,
+or harder difficulty could still surface an effect, but the current pattern suggests
+the same null.
 

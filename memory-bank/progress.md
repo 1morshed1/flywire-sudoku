@@ -62,11 +62,15 @@
   CROSS-MODEL (4×4 easy, 100 puzzles, loop completion): MLP 0.970, dense_snn 0.960,
   flywire_snn 1.000. Loop lifts all models to near-perfect; FlyWire SNN matches/edges
   baselines — biological wiring is a viable solver substrate. (Near ceiling at 4×4.)
-- **Path A (topology separation hunt)**: N=200 4×4 easy (capacity bottleneck, 3 seeds):
-  flywire solve_rate 0.605 / shuffled 0.595 / random 0.580 (move_acc all ~0.92). FAINT
-  ordered hint — solve_rate tracks reciprocity order (flywire≥shuffled≥random) — but
-  gap (0.025) < seed spread (0.085), NOT significant at 3 seeds. Running an 8-seed power
-  test to confirm/bury the trend. Still essentially null; direction is suggestive.
+- **Path A (topology separation hunt) — CONCLUDED, NULL**: two regimes tested.
+  4×4-easy (saturated): flywire/shuffled/random all ~0.935 move_acc, equal within noise.
+  N=200 4×4 capacity bottleneck, 8 seeds: flywire solve_rate 0.590±0.027 / shuffled
+  0.587±0.029 / random 0.575±0.030. flywire−random = 0.015, se 0.014, z≈1.05 → NOT
+  significant. The 3-seed hint (0.025) shrank to 0.015 with more seeds. VERDICT: no
+  topology separation at accessible scale — biological wiring gives no measurable
+  advantage on Sudoku despite 10–13× reciprocity differences. flywire is consistently
+  numerically highest but it's a whisper, not a signal. Legit negative result. Could
+  push 9×9 / larger N / harder difficulty, but pattern suggests same null.
 
 ## What's left
 

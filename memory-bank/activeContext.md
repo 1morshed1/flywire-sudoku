@@ -2,23 +2,18 @@
 
 ## Current focus
 
-Phases 0-6 done. **AWAITING USER DECISION on next path (A vs B vs both).** Do not
-start coding until user picks. See "Decision pending" below.
+Phases 0-7 done. Paths A + B both executed (user chose "both"). All 8 planned phases
+complete. Remaining optional work: video (docs/VIDEO_PLAN.md), deeper Path-A regimes
+(9×9 / larger N), RL polish. Await user steer on which, if any.
 
-## Decision pending (start of next session)
+## Paths A + B outcomes (done)
 
-The 4×4-easy topology ablation was a NULL result (task saturates). Two ways forward,
-user to choose:
-- **A — hunt for topology separation** (extend Phase 6): re-run the ablation in a
-  capacity-pressured regime where wiring could matter — 9×9 (more epochs), smaller N
-  (e.g. 200), and/or fewer clues (hard/expert). Machinery already supports it: just
-  new AblationConfig / TrainConfig values (n_neurons, side, difficulty, epochs). This
-  is the real science payoff.
-- **B — Phase 7 autonomous solver**: constraint-propagation loop → full-puzzle solve
-  + completion metrics (see "Next steps" below).
-- Or **both, A then B**.
-
-User leaning: not yet stated. Ask/confirm before implementing.
+- **A (topology hunt): NULL at accessible scale.** 4×4-easy saturates; N=200 8-seed
+  power test → flywire 0.590 vs random 0.575, z≈1.05, not significant. Biological
+  wiring gives no measurable Sudoku advantage despite big reciprocity gaps. Legit
+  negative result. (9×9/larger-N could still be tried but pattern suggests same null.)
+- **B (Phase 7 solver): WORKS.** Constraint loop makes every model a near-perfect
+  solver (4×4 loop completion: MLP 0.970, dense 0.960, flywire 1.000).
 
 ## Recent changes
 
