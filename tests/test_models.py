@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from models import SudokuMLP
 from sudoku import SudokuSpec
 from training.dataset import SudokuMoveDataset, build_dataset
-from training.supervised import TrainConfig, evaluate, masked_ce_loss, train_mlp
+from training.supervised import TrainConfig, evaluate, masked_ce_loss, teacher_fill, train_mlp
 
 
 def test_forward_shapes():
@@ -86,3 +86,51 @@ def test_mlp_learns_4x4():
     metrics = train_mlp(cfg, verbose=False)
     # Chance on 4x4 is 0.25; a working pipeline reaches ~0.9 empty-cell accuracy.
     assert metrics["move_acc"] > 0.8
+
+
+def test_teacher_fill_reveals_solution_digits():
+    """Teacher fill must write solution digits and shrink the empty mask."""
+    spec = SudokuSpec.from_side(4)
+    t = build_dataset(spec, 4, difficulty="easy", seed=0, cache=False)
+    x, target, empty = t.x[:2], t.target[:2], t.empty[:2]
+    n_empty0 = int(empty.sum())
+    x2, empty2 = teacher_fill(x, target, empty, spec, fill_frac=1.0)
+    assert int(empty2.sum()) < n_empty0
+    channels = spec.side + 1
+    boards = x2.view(2, spec.num_cells, channels).argmax(-1)
+    filled = empty & ~empty2
+    assert torch.all(boards[filled] == target[filled] + 1)
+    clue = ~empty
+    boards0 = x.view(2, spec.num_cells, channels).argmax(-1)
+    assert torch.all(boards[clue] == boards0[clue])
+
+
+def test_teacher_fill_n_fill_exact():
+    spec = SudokuSpec.from_side(4)
+    t = build_dataset(spec, 2, difficulty="easy", seed=1, cache=False)
+    x, target, empty = t.x, t.target, t.empty
+    _x2, empty2 = teacher_fill(x, target, empty, spec, n_fill=2)
+    for i in range(x.shape[0]):
+        n0 = int(empty[i].sum())
+        n1 = int(empty2[i].sum())
+        assert n1 == max(n0 - 2, 0)
+
+
+def test_loop_steps_train_smoke():
+    """loop_steps / partial_fill must run without crashing and beat chance on 4x4."""
+    cfg = TrainConfig(
+        side=4,
+        hidden=(128, 64),
+        n_train=512,
+        n_val=64,
+        difficulty="easy",
+        epochs=8,
+        batch_size=32,
+        lr=1e-3,
+        seed=0,
+        device="cpu",
+        partial_fill_frac=1.0,
+        loop_steps=3,
+    )
+    metrics = train_mlp(cfg, verbose=False)
+    assert metrics["move_acc"] > 0.3

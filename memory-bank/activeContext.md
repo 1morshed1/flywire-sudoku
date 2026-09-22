@@ -1,27 +1,21 @@
 # Active Context
 
-## RESUME HERE (option 1: 9×9 generalization — IN PROGRESS, uncommitted)
+## RESUME HERE (option A: loop-matched train — DONE, no completion gain)
 
-Picked option 1. Infra built, NOT yet run to completion (user out of time; killed mid-gen).
-**Code changed, NOT committed, NOT on origin/main:**
-- `training/dataset.py` — disk cache `data/datasets/{side}_{difficulty}_{n}_{seed}.pt`
-  (build_dataset gains `cache=True`; `_cache_path`). 40k 9×9 regen 29min → instant reload.
-- `models/flywire_snn.py` — `dropout` param → `nn.Dropout` on recurrent spikes pre-output_linear.
-- `training/supervised.py` — TrainConfig gains `snn_dropout`, `weight_decay` (already existed),
-  `save_state`, `eval_solver_seed`. Post-train: honest solver eval on unseen seed (guards vs
-  train/val seed overlap) + save state_dict.
-- `configs/flywire_snn_9x9.yaml` — the fix: n_train 40k, weight_decay 1e-4, snn_dropout 0.3,
-  N=1000, 40ep, eval_solver_seed 1234, save_state results/flywire9_state.pt.
+`configs/flywire_snn_9x9_loop.yaml` finished. Checkpoint: `results/flywire9_loop_state.pt`.
 
-**Verified:** smoke test (4×4) — dropout/wd/unseen-eval/save_state all work; cache round-trip
-(2.16s→0.001s); 65 tests pass; ruff clean.
+| metric | loop-train (1k) | prior one-shot 1k |
+|--------|-----------------|-------------------|
+| val move_acc | 0.273 | — |
+| UNSEEN completion | **0.010** | 0.010 |
+| UNSEEN placement | **0.741** | 0.740 |
 
-**NEXT SESSION — just run it (~29min gen + ~40ep train, background):**
-`uv run --no-sync python -m training.supervised --config configs/flywire_snn_9x9.yaml`
-Use `-u` or accept block-buffered log. Watch val move_acc (seed+1, unseen) + final
-`UNSEEN(seed=1234) completion`. That completion is the real number the old run failed (~0%).
-If still overfits: bump N (2000/5000), raise dropout, or more data (60k). Then commit + rebuild
-9×9 video from the saved state (draws real unseen puzzle, not training-seed).
+Teacher-forced mid-solve boards did **not** raise completion. Same ~74% placement /
+~1% full solves. Option A alone is insufficient for 9×9 autonomous solve.
+
+Next levers if continuing: (B) curriculum 4×4→9×9, (C) non-FlyWire baseline on same
+loop recipe, (E) write up limits, or train the greedy *action* (cell,digit) directly
+instead of full-grid CE.
 
 ## Current focus
 

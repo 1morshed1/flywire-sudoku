@@ -1,0 +1,40 @@
+# Option A: train for the constraint-propagation loop via teacher-forced partial boards.
+# Same 1k FlyWire recipe that had the best placement (~0.74), plus:
+#   partial_fill_frac=1.0  — each batch sees a random mid-solve board
+#   loop_steps=4           — CE along a short teacher-forced fill trajectory
+# Run: CUDA_VISIBLE_DEVICES=2 uv run --no-sync python -m training.supervised \
+#        --config configs/flywire_snn_9x9_loop.yaml
+
+model: flywire_snn
+side: 9
+
+n_neurons: 1000
+sample_method: top_degree
+conn_weight: count
+
+train_recurrent: true
+use_signs: false
+recurrent_scale: 1.0
+
+T: 10
+encoding: constant
+
+n_train: 40000
+n_val: 2000
+difficulty: easy
+epochs: 40
+batch_size: 128
+lr: 0.001
+weight_decay: 0.0001
+snn_dropout: 0.1
+amp: false
+seed: 0
+device: auto
+log_every: 2
+
+# Loop-matching train
+partial_fill_frac: 1.0
+loop_steps: 4
+
+eval_solver_seed: 1234
+save_state: results/flywire9_loop_state.pt

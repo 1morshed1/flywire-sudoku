@@ -3,11 +3,12 @@
 # EYEBALL THIS BEFORE INSTALL. Nothing is installed until you approve `uv sync`.
 #
 # Notes / risk flags:
-#  - torch is pulled from PyTorch's CUDA 12.4 wheel index (cu124). RTX 2060 is
-#    Turing sm_75 — fully supported by modern cu12 wheels.
+#  - torch is pulled from PyTorch's CUDA 12.8 wheel index (cu128). Required for
+#    Blackwell GPUs (sm_120), e.g. RTX PRO 6000. Older cu124 builds detect the
+#    device but fail at runtime ("no kernel image").
 #  - Norse (spiking-NN layer on torch) is the fragile pin. Its released wheels can
-#    lag the newest torch/Python. If `uv sync` fails to resolve norse against
-#    torch 2.5 on py3.12, fallback options (in order): (a) loosen to torch ~2.4,
+#    lag the newest torch/Python. If `uv sync` fails to resolve norse, fallback
+#    options (in order): (a) pin an older torch still on cu128 (>=2.7),
 #    (b) install norse from git main, (c) drop to py3.11. Decide at sync time.
 #  - caveclient / FlyWire data deps are NOT here yet — added in Phase 4 to keep
 #    the Phase 0 env minimal.
@@ -28,7 +29,7 @@ dependencies = [
     "pyarrow>=16.0",         # parquet backend
 
     # --- deep learning ---
-    "torch>=2.4,<2.6",       # cu124 wheel via [tool.uv.index] below
+    "torch>=2.7,<2.12",      # cu128 wheel via [tool.uv.index] below (Blackwell sm_120)
     "norse>=1.1.0",          # LIF neurons + surrogate gradients (RISK: see header)
 
     # --- graph / connectome ---
@@ -52,14 +53,14 @@ dev = [
     "ipython>=8.0",
 ]
 
-# --- pull torch from the CUDA 12.4 wheel index instead of PyPI CPU wheels ---
+# --- pull torch from the CUDA 12.8 wheel index (Blackwell / sm_120) ---
 [[tool.uv.index]]
-name = "pytorch-cu124"
-url = "https://download.pytorch.org/whl/cu124"
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
 [tool.uv.sources]
-torch = { index = "pytorch-cu124" }
+torch = { index = "pytorch-cu128" }
 
 [tool.ruff]
 line-length = 100

@@ -1,0 +1,39 @@
+# FlyWire-constrained SNN, 9x9 — capacity bump after 1k underfit.
+# Prior 1k / 40k / dropout0.3 run: placement_acc ~0.74 but UNSEEN completion ~0.01.
+# This keeps the same data + regularization recipe and scales N 1000 → 5000.
+# Run: CUDA_VISIBLE_DEVICES=2 uv run --no-sync python -m training.supervised \
+#        --config configs/flywire_snn_9x9_5k.yaml
+
+model: flywire_snn
+side: 9
+
+# Connectome mask
+n_neurons: 5000
+sample_method: top_degree
+conn_weight: count
+
+# Trainable regime
+train_recurrent: true
+use_signs: false
+recurrent_scale: 1.0
+
+# Spiking sim
+T: 10
+encoding: constant
+
+# Data / optim (same generalization recipe as flywire_snn_9x9.yaml)
+n_train: 40000
+n_val: 2000
+difficulty: easy
+epochs: 40
+batch_size: 128
+lr: 0.001
+weight_decay: 0.0001
+snn_dropout: 0.3
+amp: false
+seed: 0
+device: auto
+log_every: 2
+
+eval_solver_seed: 1234
+save_state: results/flywire9_5k_state.pt

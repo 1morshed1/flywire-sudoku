@@ -56,6 +56,62 @@ def masked_ce_loss(logits: torch.Tensor, target: torch.Tensor, empty: torch.Tens
 
 
 @torch.no_grad()
+def teacher_fill(
+    x: torch.Tensor,
+    target: torch.Tensor,
+    empty: torch.Tensor,
+    spec: SudokuSpec,
+    *,
+    fill_frac: float = 1.0,
+    n_fill: int | None = None,
+    generator: torch.Generator | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Reveal solution digits into a random subset of empty cells (teacher force).
+
+    Used so training boards match the *intermediate* states the constraint-propagation
+    solve loop sees (partially filled), not only the initial puzzle. Digits come from
+    ``target`` (always correct); which cells are revealed is random.
+
+    Parameters
+    ----------
+    fill_frac:
+        Upper bound on the fraction of currently-empty cells to fill when ``n_fill``
+        is None. Per board, ``k ~ Uniform(0, floor(frac * n_empty))``.
+    n_fill:
+        If set, fill exactly this many empty cells per board (capped by n_empty).
+    """
+    if fill_frac < 0.0 or fill_frac > 1.0:
+        raise ValueError(f"fill_frac must be in [0, 1], got {fill_frac}")
+    b, feat = x.shape
+    n = spec.num_cells
+    channels = spec.side + 1
+    if feat != n * channels:
+        raise ValueError(f"x width {feat} != num_cells*(side+1)={n * channels}")
+
+    boards = x.view(b, n, channels).argmax(dim=-1).clone()  # values 0..side
+    new_empty = empty.clone()
+    for i in range(b):
+        idx = torch.where(empty[i])[0]
+        n_empty = int(idx.numel())
+        if n_empty == 0:
+            continue
+        if n_fill is not None:
+            k = min(n_fill, n_empty)
+        else:
+            k_max = int(n_empty * fill_frac)
+            k = int(torch.randint(0, k_max + 1, (1,), generator=generator).item())
+        if k == 0:
+            continue
+        pick = idx[torch.randperm(n_empty, generator=generator, device=idx.device)[:k]]
+        boards[i, pick] = target[i, pick] + 1  # target is 0..side-1; board uses 1..side
+        new_empty[i, pick] = False
+
+    new_x = torch.zeros_like(x)
+    new_x.view(b, n, channels).scatter_(-1, boards.unsqueeze(-1), 1.0)
+    return new_x, new_empty
+
+
+@torch.no_grad()
 def evaluate(model: nn.Module, loader: DataLoader, device: torch.device) -> dict[str, float]:
     """Compute move accuracy and single-shot solve rate over a loader."""
     model.eval()
@@ -101,6 +157,9 @@ class TrainConfig:
     use_signs: bool = False  # True = Regime B (Dale's-law signs)
     recurrent_scale: float = 1.0
     snn_dropout: float = 0.0  # dropout on recurrent spikes (FlyWireSNN regularization)
+    # Loop-matching train (option A): expose intermediate boards via teacher force.
+    partial_fill_frac: float = 0.0  # 0=off; else randomly fill U(0, frac*empty) before forward
+    loop_steps: int = 1  # >1: accumulate CE along a teacher-forced fill trajectory
     n_train: int = 5000
     n_val: int = 500
     difficulty: str = "easy"
@@ -182,10 +241,13 @@ def train_supervised(
     # GradScaler is a no-op when disabled, so it is safe to construct on CPU too.
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
+    if cfg.loop_steps < 1:
+        raise ValueError(f"loop_steps must be >= 1, got {cfg.loop_steps}")
     if verbose:
         print(
             f"[{cfg.model}] side={cfg.side} params={model.num_parameters():,} "
-            f"device={device} amp={use_amp} train={cfg.n_train} val={cfg.n_val}"
+            f"device={device} amp={use_amp} train={cfg.n_train} val={cfg.n_val} "
+            f"partial_fill={cfg.partial_fill_frac} loop_steps={cfg.loop_steps}"
         )
 
     metrics: dict[str, float] = {}
@@ -194,13 +256,28 @@ def train_supervised(
         running = 0.0
         for x, target, empty in train_loader:
             x, target, empty = x.to(device), target.to(device), empty.to(device)
+            # Optional: random teacher-filled prefix so boards look like mid-solve states.
+            if cfg.partial_fill_frac > 0.0:
+                x, empty = teacher_fill(
+                    x, target, empty, spec, fill_frac=cfg.partial_fill_frac
+                )
             opt.zero_grad()
             with torch.autocast(device_type=device.type, enabled=use_amp):
                 loss = masked_ce_loss(model(x), target, empty)
+                # Extra teacher-forced steps: fill one true digit, score again (loop match).
+                x_s, empty_s = x, empty
+                for _ in range(cfg.loop_steps - 1):
+                    x_s, empty_s = teacher_fill(
+                        x_s, target, empty_s, spec, n_fill=1
+                    )
+                    if not empty_s.any():
+                        break
+                    loss = loss + masked_ce_loss(model(x_s), target, empty_s)
+                loss = loss / cfg.loop_steps
             scaler.scale(loss).backward()
             scaler.step(opt)
             scaler.update()
-            running += float(loss) * x.shape[0]
+            running += float(loss.detach()) * x.shape[0]
         metrics = evaluate(model, val_loader, device)
         if verbose and (epoch % cfg.log_every == 0 or epoch == cfg.epochs):
             print(
