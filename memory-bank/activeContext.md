@@ -1,21 +1,21 @@
 # Active Context
 
-## RESUME HERE (option A: loop-matched train — DONE, no completion gain)
+## RESUME HERE (B+C+D — ALL DONE)
 
-`configs/flywire_snn_9x9_loop.yaml` finished. Checkpoint: `results/flywire9_loop_state.pt`.
+Honest UNSEEN(seed=1234) scoreboard for 9×9 autonomous solve:
 
-| metric | loop-train (1k) | prior one-shot 1k |
-|--------|-----------------|-------------------|
-| val move_acc | 0.273 | — |
-| UNSEEN completion | **0.010** | 0.010 |
-| UNSEEN placement | **0.741** | 0.740 |
+| Run | completion | placement | notes |
+|-----|------------|-----------|-------|
+| FlyWire 1k drop0.3 (earlier) | **0.01** | **0.74** | still best FlyWire |
+| A loop-train 1k | 0.01 | 0.74 | no gain |
+| C MLP 40k | **0.02** | **0.77** | best overall; still ~0% solves |
+| C dense SNN 40k | 0.00 | 0.69 | did not learn (move_acc~0.11) |
+| D 1k drop0+cosine 60ep | 0.00 | 0.73 | worse than drop0.3 |
+| B curriculum 4→6→9 | 0.00 | 0.73 | 4×4 0.97 / 6×6 0.83; 9×9 resets |
 
-Teacher-forced mid-solve boards did **not** raise completion. Same ~74% placement /
-~1% full solves. Option A alone is insufficient for 9×9 autonomous solve.
-
-Next levers if continuing: (B) curriculum 4×4→9×9, (C) non-FlyWire baseline on same
-loop recipe, (E) write up limits, or train the greedy *action* (cell,digit) directly
-instead of full-grid CE.
+**Verdict:** No recipe yields real 9×9 completion. MLP slightly edges FlyWire on
+placement; capacity/dropout/curriculum/loop-train all fail to unlock solves.
+Natural next: research writeup (E) or supervise greedy (cell,digit) actions.
 
 ## Current focus
 

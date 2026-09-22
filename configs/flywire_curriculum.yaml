@@ -1,0 +1,32 @@
+# Option B: FlyWire curriculum 4→6→9 with recurrent weight transfer.
+# Run: CUDA_VISIBLE_DEVICES=2 uv run --no-sync python -m experiments.curriculum \
+#        --config configs/flywire_curriculum.yaml
+
+model: flywire_snn
+# side / n_train / epochs overridden per stage in experiments/curriculum.py
+
+n_neurons: 1000
+sample_method: top_degree
+conn_weight: count
+
+train_recurrent: true
+use_signs: false
+recurrent_scale: 1.0
+
+T: 10
+encoding: constant
+
+difficulty: easy
+batch_size: 128
+lr: 0.001
+weight_decay: 0.0001
+snn_dropout: 0.0
+use_cosine: true
+amp: false
+seed: 0
+device: auto
+log_every: 2
+
+# Applied on the final 9x9 stage only:
+eval_solver_seed: 1234
+save_state: results/flywire9_curriculum_state.pt

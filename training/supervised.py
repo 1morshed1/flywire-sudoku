@@ -167,6 +167,7 @@ class TrainConfig:
     batch_size: int = 128
     lr: float = 1e-3
     weight_decay: float = 0.0
+    use_cosine: bool = False  # CosineAnnealingLR over epochs (option D)
     amp: bool = False  # mixed precision (CUDA only); PLAN.md §R4
     seed: int = 0
     device: str = "auto"
@@ -210,8 +211,34 @@ def build_model(spec: SudokuSpec, cfg: TrainConfig) -> nn.Module:
     raise ValueError(f"unknown model {cfg.model!r}")
 
 
+def copy_flywire_recurrent(src: nn.Module, dst: nn.Module) -> None:
+    """Copy FlyWire recurrent edge weights from ``src`` into ``dst`` (same subgraph).
+
+    Used by the 4→6→9 curriculum: I/O projections are size-specific and re-initialized,
+    but the connectome-masked recurrent core can transfer when ``N`` and edge layout match.
+    """
+    if type(src).__name__ != "FlyWireSNN" or type(dst).__name__ != "FlyWireSNN":
+        raise TypeError("copy_flywire_recurrent expects FlyWireSNN modules")
+    if src.N != dst.N:
+        raise ValueError(f"N mismatch: src={src.N} dst={dst.N}")
+    if src.rec_indices.shape != dst.rec_indices.shape:
+        raise ValueError("recurrent edge layout mismatch (different subgraph?)")
+    if not torch.equal(src.rec_indices.cpu(), dst.rec_indices.cpu()):
+        raise ValueError("recurrent indices differ; use the same sample seed/method")
+    with torch.no_grad():
+        dst.rec_weight.copy_(
+            src.rec_weight.detach().to(
+                device=dst.rec_weight.device, dtype=dst.rec_weight.dtype
+            )
+        )
+
+
 def train_supervised(
-    cfg: TrainConfig, *, verbose: bool = True, return_model: bool = False
+    cfg: TrainConfig,
+    *,
+    verbose: bool = True,
+    return_model: bool = False,
+    warm_recurrent: nn.Module | None = None,
 ) -> dict[str, float] | tuple[dict[str, float], nn.Module]:
     """Train any model with the shared contract; return final validation metrics.
 
@@ -225,6 +252,9 @@ def train_supervised(
         If True, return ``(metrics, model)`` so callers (e.g. the Phase 7 solver
         evaluation) can use the trained network directly. The model stays on its
         training device.
+    warm_recurrent:
+        Optional previously-trained FlyWireSNN whose recurrent edge weights are
+        copied into the new model before training (curriculum 4→6→9).
     """
     torch.manual_seed(cfg.seed)
     spec = SudokuSpec.from_side(cfg.side)
@@ -236,7 +266,16 @@ def train_supervised(
     val_loader = DataLoader(SudokuMoveDataset(val_t), batch_size=cfg.batch_size)
 
     model = build_model(spec, cfg).to(device)
+    if warm_recurrent is not None:
+        copy_flywire_recurrent(warm_recurrent, model)
+        if verbose:
+            print(f"[{cfg.model}] warmed recurrent weights from prior stage (N={model.N})")
     opt = torch.optim.Adam(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    scheduler = (
+        torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.epochs)
+        if cfg.use_cosine
+        else None
+    )
     use_amp = cfg.amp and device.type == "cuda"
     # GradScaler is a no-op when disabled, so it is safe to construct on CPU too.
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
@@ -279,6 +318,8 @@ def train_supervised(
             scaler.update()
             running += float(loss.detach()) * x.shape[0]
         metrics = evaluate(model, val_loader, device)
+        if scheduler is not None:
+            scheduler.step()
         if verbose and (epoch % cfg.log_every == 0 or epoch == cfg.epochs):
             print(
                 f"[{cfg.model}] epoch {epoch:3d}  loss {running / cfg.n_train:.4f}  "
